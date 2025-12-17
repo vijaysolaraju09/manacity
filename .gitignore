@@ -1,0 +1,9 @@
+# Create .gitignore in the root directory
+@"
+node_modules/
+.env
+npm-debug.log
+*.log
+dist/
+.DS_Store
+"@ | Out-File -Encoding UTF8 .gitignore

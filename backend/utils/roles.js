@@ -1,0 +1,8 @@
+const ROLES = {
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  LOCAL_ADMIN: 'LOCAL_ADMIN',
+  BUSINESS: 'BUSINESS',
+  USER: 'USER',
+};
+
+module.exports = ROLES;
