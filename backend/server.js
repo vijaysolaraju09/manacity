@@ -46,6 +46,7 @@ validateEnv();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const HOST = process.env.HOST || "127.0.0.1";
 
 // Trust proxy (required for Nginx/Load Balancer)
 app.set('trust proxy', 1);
@@ -159,7 +160,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`Manacity API running on port ${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`Manacity API running on http://${HOST}:${PORT}`);
   startServiceExpiryJob();
 });
