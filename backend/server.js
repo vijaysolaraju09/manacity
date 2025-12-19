@@ -113,6 +113,18 @@ app.get('/health/db', async (req, res) => {
   }
 });
 
+// Swagger UI (Non-production only)
+if (process.env.NODE_ENV !== 'production') {
+  const swaggerUi = require('swagger-ui-express');
+  const swaggerSpec = require('./docs/swagger');
+  const swaggerUiOptions = {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  };
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
+}
+
 // Global Auth Middleware (Protects all routes below this point)
 app.use(authMiddleware);
 
