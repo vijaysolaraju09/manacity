@@ -20,6 +20,45 @@ const options = {
           bearerFormat: 'JWT',
         },
       },
+      schemas: {
+        ErrorResponse: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', example: 'error' },
+            message: { type: 'string', example: 'An error occurred' },
+          },
+        },
+        PaginationMeta: {
+          type: 'object',
+          properties: {
+            total: { type: 'integer', example: 100 },
+            page: { type: 'integer', example: 1 },
+            limit: { type: 'integer', example: 10 },
+            pages: { type: 'integer', example: 10 },
+          },
+        },
+        LocationContextError: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', example: 'error' },
+            message: { type: 'string', example: 'Location context missing or invalid' },
+          },
+        },
+        UnauthorizedError: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', example: 'error' },
+            message: { type: 'string', example: 'Unauthorized access' },
+          },
+        },
+        ForbiddenError: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', example: 'error' },
+            message: { type: 'string', example: 'Access forbidden' },
+          },
+        },
+      },
     },
     security: [
       {
