@@ -3,12 +3,14 @@ const { verifyToken } = require('../utils/jwt');
 const authMiddleware = (req, res, next) => {
   const openPaths = [
     "/health",
-    "/health/db"
+    "/health/db",
+    "/docs"
   ];
 
   if (
     openPaths.includes(req.originalUrl) ||
-    req.originalUrl.startsWith("/api/auth")
+    req.originalUrl.startsWith("/api/auth") ||
+    req.originalUrl.startsWith("/docs")
   ) {
     return next();
   }
