@@ -1,5 +1,6 @@
 require('dotenv').config();
 const authRoutes = require('./routes/authRoutes');
+const authFirebase = require('./routes/authFirebase');
 const shopRoutes = require('./routes/shopRoutes');
 const shopAdminRoutes = require('./routes/shopAdminRoutes');
 const shopVisibilityRoutes = require('./routes/shopVisibilityRoutes');
@@ -81,6 +82,8 @@ app.use('/api', limiter);
 
 app.use(express.json({ limit: '1mb' }));
 
+// Mount Firebase auth routes before existing auth routes to override registration logic
+app.use('/api/auth', authFirebase);
 app.use('/api/auth', authRoutes);
 
 // Endpoints
