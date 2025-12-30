@@ -161,8 +161,25 @@ const login = async (req, res) => {
   try {
     const { phone, password } = req.body;
 
+    // Normalize phone to E.164 with default +91 when missing country code
+    const normalizePhone = (rawPhone) => {
+      const stringPhone = String(rawPhone ?? '').trim();
+      if (!stringPhone) return null;
+
+      if (stringPhone.startsWith('+')) {
+        return /^\+\d{10,15}$/.test(stringPhone) ? stringPhone : null;
+      }
+
+      return /^\d{10}$/.test(stringPhone) ? `+91${stringPhone}` : null;
+    };
+
+    const normalizedPhone = normalizePhone(phone);
+
     // 1. Validation
-    if (!phone || !password) {
+    if (!normalizedPhone) {
+      return res.status(400).json({ error: 'Invalid phone number' });
+    }
+    if (!password) {
       return res.status(400).json({ error: 'Phone and password are required' });
     }
 
@@ -172,7 +189,7 @@ const login = async (req, res) => {
       FROM users 
       WHERE phone = $1 AND is_active = true AND deleted_at IS NULL
     `;
-    const { rows } = await query(userQuery, [phone]);
+    const { rows } = await query(userQuery, [normalizedPhone]);
 
     if (rows.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -189,6 +206,7 @@ const login = async (req, res) => {
     // 4. Generate JWT
     const token = generateToken({
       user_id: user.id,
+      phone: user.phone,
       role: user.role,
       location_id: user.location_id
     });
