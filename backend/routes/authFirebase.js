@@ -25,15 +25,26 @@ const bcrypt = require('bcrypt');
  *     security:
  *       - bearerAuth: []
  *     requestBody:
- *       required: false
+ *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - name
+ *               - password
+ *               - location_id
  *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Full name of the user.
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: Password for the account (minimum 8 characters).
  *               location_id:
- *                 type: integer
- *                 description: Optional location ID for the user context.
+ *                 type: string
+ *                 description: Active location ID for the user context.
  *     responses:
  *       200:
  *         description: User registered successfully. Returns Manacity JWT.
@@ -44,24 +55,42 @@ const bcrypt = require('bcrypt');
  */
 router.post('/register', verifyFirebaseToken, async (req, res) => {
   const { phone_number } = req.firebaseUser;
-  const { location_id } = req.body || {};
+  const { name, password, location_id } = req.body || {};
+
+  const trimmedName = typeof name === 'string' ? name.trim() : '';
+  const sanitizedLocationId = typeof location_id === 'string' ? location_id.trim() : location_id;
 
   if (!phone_number) {
     return res.status(400).json({ error: 'Firebase token missing phone number' });
   }
 
   try {
-    if (!location_id) {
+    if (!trimmedName) {
+      console.warn('Firebase register validation failed: missing name', { phone: phone_number });
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    if (!password || typeof password !== 'string' || password.length < 8) {
+      console.warn('Firebase register validation failed: invalid password', { phone: phone_number });
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    if (!sanitizedLocationId) {
+      console.warn('Firebase register validation failed: missing location', { phone: phone_number });
       return res.status(400).json({ error: 'Location ID is required' });
     }
 
     // Validate location is active
     const locationResult = await query(
       'SELECT id FROM locations WHERE id = $1 AND is_active = true',
-      [location_id]
+      [sanitizedLocationId]
     );
 
     if (locationResult.rows.length === 0) {
+      console.warn('Firebase register validation failed: inactive/invalid location', {
+        phone: phone_number,
+        location_id: sanitizedLocationId,
+      });
       return res.status(400).json({ error: 'Invalid or inactive location' });
     }
 
@@ -74,13 +103,13 @@ router.post('/register', verifyFirebaseToken, async (req, res) => {
     }
 
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(phone_number, salt);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
     const insertResult = await query(
-      `INSERT INTO users (phone, password_hash, role, location_id, approval_status)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO users (phone, password_hash, role, location_id, name, approval_status)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, phone, role, location_id, name`,
-      [phone_number, hashedPassword, 'USER', location_id, 'APPROVED']
+      [phone_number, hashedPassword, 'USER', sanitizedLocationId, trimmedName, 'APPROVED']
     );
     const user = insertResult.rows[0];
 
