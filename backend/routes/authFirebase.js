@@ -44,30 +44,52 @@ const bcrypt = require('bcrypt');
  */
 router.post('/register', verifyFirebaseToken, async (req, res) => {
   const { phone_number } = req.firebaseUser;
+  const { location_id } = req.body || {};
 
   if (!phone_number) {
     return res.status(400).json({ error: 'Firebase token missing phone number' });
   }
 
   try {
-    // Check if user exists using the verified phone number from Firebase
-    const userResult = await query('SELECT * FROM users WHERE phone = $1', [phone_number]);
-    let user = userResult.rows[0];
-
-    if (!user) {
-      // Create new user if not exists
-      // Defaulting role to USER. location_id is optional but recommended if required by DB constraints.
-      const { location_id } = req.body;
-      
-      const insertResult = await query(
-        'INSERT INTO users (phone, role, location_id) VALUES ($1, $2, $3) RETURNING *',
-        [phone_number, 'USER', location_id || null]
-      );
-      user = insertResult.rows[0];
+    if (!location_id) {
+      return res.status(400).json({ error: 'Location ID is required' });
     }
 
+    // Validate location is active
+    const locationResult = await query(
+      'SELECT id FROM locations WHERE id = $1 AND is_active = true',
+      [location_id]
+    );
+
+    if (locationResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or inactive location' });
+    }
+
+    // Check if user exists using the verified phone number from Firebase
+    const userResult = await query('SELECT id FROM users WHERE phone = $1', [phone_number]);
+    const existingUser = userResult.rows[0];
+
+    if (existingUser) {
+      return res.status(409).json({ error: 'User already exists' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(phone_number, salt);
+
+    const insertResult = await query(
+      `INSERT INTO users (phone, password_hash, role, location_id, approval_status)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, phone, role, location_id, name`,
+      [phone_number, hashedPassword, 'USER', location_id, 'APPROVED']
+    );
+    const user = insertResult.rows[0];
+
     // Generate Manacity JWT
-    const token = generateToken(user);
+    const token = generateToken({
+      user_id: user.id,
+      role: user.role,
+      location_id: user.location_id,
+    });
 
     // Return response structure consistent with previous flow
     res.json({ token, user });
