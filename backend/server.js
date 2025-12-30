@@ -29,6 +29,7 @@ const mobileShopRoutes = require('./routes/mobile/shopRoutes');
 const mobileProductRoutes = require('./routes/mobile/productRoutes');
 const mobileCartRoutes = require('./routes/mobile/cartRoutes');
 const mobileOrderRoutes = require('./routes/mobile/orderRoutes');
+const publicRoutes = require('./routes/publicRoutes');
 const { startServiceExpiryJob } = require('./utils/jobs/serviceExpiryJob');
 
 const express = require('express');
@@ -125,6 +126,9 @@ const swaggerUiOptions = {
   },
 };
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
+
+// Public Routes (no auth or location middleware)
+app.use('/api/public', publicRoutes);
 
 // Global Auth Middleware (Protects all routes below this point)
 app.use(authMiddleware);
