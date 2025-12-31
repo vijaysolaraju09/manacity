@@ -4,6 +4,7 @@ const { query } = require('../config/db');
 const { generateToken } = require('../utils/jwt');
 const verifyFirebaseToken = require('../middlewares/firebaseAuth');
 const bcrypt = require('bcrypt');
+const { createError } = require('../utils/errors');
 
 /**
  * @swagger
@@ -53,7 +54,7 @@ const bcrypt = require('bcrypt');
  *       500:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/register', verifyFirebaseToken, async (req, res) => {
+router.post('/register', verifyFirebaseToken, async (req, res, next) => {
   const { phone_number } = req.firebaseUser;
   const { name, password, location_id } = req.body || {};
 
@@ -61,23 +62,23 @@ router.post('/register', verifyFirebaseToken, async (req, res) => {
   const sanitizedLocationId = typeof location_id === 'string' ? location_id.trim() : location_id;
 
   if (!phone_number) {
-    return res.status(400).json({ error: 'Firebase token missing phone number' });
+    return next(createError(400, 'FIREBASE_PHONE_MISSING', 'Firebase token missing phone number'));
   }
 
   try {
     if (!trimmedName) {
       console.warn('Firebase register validation failed: missing name', { phone: phone_number });
-      return res.status(400).json({ error: 'Name is required' });
+      return next(createError(400, 'USER_NAME_REQUIRED', 'Name is required'));
     }
 
     if (!password || typeof password !== 'string' || password.length < 8) {
       console.warn('Firebase register validation failed: invalid password', { phone: phone_number });
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      return next(createError(400, 'PASSWORD_TOO_SHORT', 'Password must be at least 8 characters'));
     }
 
     if (!sanitizedLocationId) {
       console.warn('Firebase register validation failed: missing location', { phone: phone_number });
-      return res.status(400).json({ error: 'Location ID is required' });
+      return next(createError(400, 'LOCATION_ID_REQUIRED', 'Location ID is required'));
     }
 
     // Validate location is active
@@ -91,7 +92,7 @@ router.post('/register', verifyFirebaseToken, async (req, res) => {
         phone: phone_number,
         location_id: sanitizedLocationId,
       });
-      return res.status(400).json({ error: 'Invalid or inactive location' });
+      return next(createError(400, 'LOCATION_INACTIVE', 'Invalid or inactive location'));
     }
 
     // Check if user exists using the verified phone number from Firebase
@@ -99,7 +100,7 @@ router.post('/register', verifyFirebaseToken, async (req, res) => {
     const existingUser = userResult.rows[0];
 
     if (existingUser) {
-      return res.status(409).json({ error: 'User already exists' });
+      return next(createError(409, 'USER_ALREADY_EXISTS', 'User already exists'));
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -124,7 +125,7 @@ router.post('/register', verifyFirebaseToken, async (req, res) => {
     res.json({ token, user });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 });
 
@@ -161,16 +162,16 @@ router.post('/register', verifyFirebaseToken, async (req, res) => {
  *       500:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/reset-password', verifyFirebaseToken, async (req, res) => {
+router.post('/reset-password', verifyFirebaseToken, async (req, res, next) => {
   const { phone_number } = req.firebaseUser;
   const { password } = req.body;
 
   if (!phone_number) {
-    return res.status(400).json({ error: 'Firebase token missing phone number' });
+    return next(createError(400, 'FIREBASE_PHONE_MISSING', 'Firebase token missing phone number'));
   }
 
   if (!password) {
-    return res.status(400).json({ error: 'Password is required' });
+    return next(createError(400, 'PASSWORD_REQUIRED', 'Password is required'));
   }
 
   try {
@@ -180,7 +181,7 @@ router.post('/reset-password', verifyFirebaseToken, async (req, res) => {
 
     if (!user) {
       // Generic error to prevent user enumeration
-      return res.status(400).json({ error: 'Unable to process request' });
+      return next(createError(400, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -191,7 +192,7 @@ router.post('/reset-password', verifyFirebaseToken, async (req, res) => {
     res.json({ message: 'Password updated successfully' });
   } catch (error) {
     console.error('Reset password error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 });
 

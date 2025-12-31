@@ -1,4 +1,5 @@
 const { verifyToken } = require('../utils/jwt');
+const { createError } = require('../utils/errors');
 
 const authMiddleware = (req, res, next) => {
   const openPaths = [
@@ -18,7 +19,7 @@ const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+    return next(createError(401, 'AUTH_MISSING_TOKEN', 'Authorization header missing'));
   }
 
   const token = authHeader.split(' ')[1];
@@ -29,7 +30,7 @@ const authMiddleware = (req, res, next) => {
     req.locationId = decoded.location_id;
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    return next(createError(401, 'AUTH_INVALID_TOKEN', 'Invalid or expired token'));
   }
 };
 

@@ -31,6 +31,7 @@ const mobileCartRoutes = require('./routes/mobile/cartRoutes');
 const mobileOrderRoutes = require('./routes/mobile/orderRoutes');
 const publicRoutes = require('./routes/publicRoutes');
 const { startServiceExpiryJob } = require('./utils/jobs/serviceExpiryJob');
+const { normalizeError } = require('./utils/errors');
 
 const express = require('express');
 const cors = require('cors');
@@ -84,6 +85,53 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 app.use(express.json({ limit: '1mb' }));
+
+// Normalize direct error responses before routing
+app.use((req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = (data) => {
+    const status = res.statusCode || 200;
+    const hasNormalizedShape = data
+      && typeof data === 'object'
+      && data.error
+      && typeof data.error === 'object'
+      && data.error.code
+      && data.error.message
+      && data.error.request_id;
+
+    if (!hasNormalizedShape && status >= 400 && data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'error')) {
+      const requestId = req.request_id || req.get('X-Request-Id');
+      const isProduction = process.env.NODE_ENV === 'production';
+      const defaultCodes = {
+        400: 'BAD_REQUEST',
+        401: 'UNAUTHORIZED',
+        403: 'FORBIDDEN',
+        404: 'NOT_FOUND',
+        409: 'CONFLICT',
+        429: 'TOO_MANY_REQUESTS',
+        500: 'INTERNAL_ERROR',
+        501: 'NOT_IMPLEMENTED',
+        503: 'SERVICE_UNAVAILABLE',
+      };
+
+      const errorPayload = typeof data.error === 'object' ? data.error : { message: data.error };
+      const code = errorPayload.code || data.code || defaultCodes[status] || 'INTERNAL_ERROR';
+      const rawMessage = errorPayload.message || (typeof data.error === 'string' ? data.error : null);
+      const message = status >= 500 && isProduction ? 'Internal server error' : rawMessage || 'Internal server error';
+
+      return originalJson({
+        error: {
+          code,
+          message,
+          request_id: requestId,
+        },
+      });
+    }
+
+    return originalJson(data);
+  };
+  next();
+});
 
 // Mount Firebase auth routes before existing auth routes to override registration logic
 app.use('/api/auth', authFirebase);
@@ -170,14 +218,15 @@ app.use('/api/mobile/orders', mobileOrderRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
-  const status = err.statusCode || err.status || 500;
+  const { status, code, message } = normalizeError(err);
   const requestId = req.request_id || req.get('X-Request-Id');
   const isProduction = process.env.NODE_ENV === 'production';
+  const safeMessage = status >= 500 && isProduction ? 'Internal server error' : message || 'Internal server error';
 
   const response = {
     error: {
-      code: err.code || 'INTERNAL_ERROR',
-      message: isProduction ? 'Internal Server Error' : err.message || 'Internal Server Error',
+      code: code || 'INTERNAL_ERROR',
+      message: safeMessage,
       request_id: requestId,
     },
   };
@@ -188,10 +237,11 @@ app.use((err, req, res, next) => {
     method: req.method,
     path: req.originalUrl,
     status,
-    error_name: err.name,
-    error_message: err.message,
+    error_name: err && err.name,
+    error_message: err && err.message,
     user_id: req.user ? req.user.user_id : undefined,
     location_id: req.user ? req.user.location_id : undefined,
+    stack: isProduction ? undefined : err && err.stack,
   };
 
   console.error(JSON.stringify(logPayload));

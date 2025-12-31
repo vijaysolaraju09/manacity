@@ -1,6 +1,7 @@
 const { query } = require('../config/db');
+const { createError } = require('../utils/errors');
 
-const applyShop = async (req, res) => {
+const applyShop = async (req, res, next) => {
   try {
     const { name, description } = req.body;
     const { user_id } = req.user;
@@ -8,7 +9,7 @@ const applyShop = async (req, res) => {
 
     // 1. Validation
     if (!name || name.trim().length < 3) {
-      return res.status(400).json({ error: 'Shop name is required and must be at least 3 characters.' });
+      return next(createError(400, 'SHOP_NAME_INVALID', 'Shop name is required and must be at least 3 characters.'));
     }
 
     // 2. Check for existing active shop for this user in this location
@@ -19,7 +20,7 @@ const applyShop = async (req, res) => {
     const checkRes = await query(checkQuery, [user_id, locationId]);
 
     if (checkRes.rows.length > 0) {
-      return res.status(409).json({ error: 'Shop already exists for this user in this location' });
+      return next(createError(409, 'SHOP_ALREADY_EXISTS', 'Shop already exists for this user in this location'));
     }
 
     // 3. Insert new shop
@@ -35,7 +36,7 @@ const applyShop = async (req, res) => {
 
   } catch (err) {
     console.error('Apply Shop Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
 

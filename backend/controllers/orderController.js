@@ -1,6 +1,7 @@
 const { pool } = require('../config/db');
+const { createError } = require('../utils/errors');
 
-const createOrder = async (req, res) => {
+const createOrder = async (req, res, next) => {
   const client = await pool.connect();
   try {
     const { shop_id, items, delivery_address } = req.body;
@@ -8,10 +9,10 @@ const createOrder = async (req, res) => {
     const locationId = req.locationId;
 
     // 1. Input Validation
-    if (!shop_id) return res.status(400).json({ error: 'shop_id is required' });
-    if (!delivery_address) return res.status(400).json({ error: 'delivery_address is required' });
+    if (!shop_id) return next(createError(400, 'ORDER_SHOP_REQUIRED', 'shop_id is required'));
+    if (!delivery_address) return next(createError(400, 'ORDER_ADDRESS_REQUIRED', 'delivery_address is required'));
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'items must be a non-empty array' });
+      return next(createError(400, 'ORDER_ITEMS_REQUIRED', 'items must be a non-empty array'));
     }
 
     // 2. Shop Validation
@@ -23,12 +24,12 @@ const createOrder = async (req, res) => {
     const shopRes = await client.query(shopQuery, [shop_id, locationId]);
 
     if (shopRes.rows.length === 0) {
-      return res.status(404).json({ error: 'Shop not found in this location' });
+      return next(createError(404, 'SHOP_NOT_FOUND', 'Shop not found in this location'));
     }
 
     const shop = shopRes.rows[0];
     if (shop.approval_status !== 'APPROVED' || !shop.is_open || shop.is_hidden) {
-      return res.status(409).json({ error: 'Shop is not available for orders' });
+      return next(createError(409, 'SHOP_NOT_AVAILABLE', 'Shop is not available for orders'));
     }
 
     // 3. Product Validation & Pricing
@@ -52,22 +53,22 @@ const createOrder = async (req, res) => {
       const quantity = parseInt(item.quantity, 10);
 
       if (isNaN(quantity) || quantity <= 0) {
-        return res.status(400).json({ error: 'Quantity must be > 0' });
+        return next(createError(400, 'ORDER_ITEM_QUANTITY_INVALID', 'Quantity must be > 0'));
       }
 
       const product = productsMap.get(product_id);
 
       if (!product) {
-        return res.status(400).json({ error: `Product ${product_id} not found` });
+        return next(createError(400, 'ORDER_PRODUCT_NOT_FOUND', `Product ${product_id} not found`));
       }
       if (product.shop_id !== shop_id) {
-        return res.status(400).json({ error: `Product ${product.name} does not belong to this shop` });
+        return next(createError(400, 'ORDER_PRODUCT_SHOP_MISMATCH', `Product ${product.name} does not belong to this shop`));
       }
       if (product.location_id !== locationId) {
-        return res.status(400).json({ error: `Product ${product.name} is not in this location` });
+        return next(createError(400, 'ORDER_PRODUCT_LOCATION_MISMATCH', `Product ${product.name} is not in this location`));
       }
       if (!product.is_available) {
-        return res.status(400).json({ error: `Product ${product.name} is not available` });
+        return next(createError(400, 'ORDER_PRODUCT_UNAVAILABLE', `Product ${product.name} is not available`));
       }
 
       const price = parseFloat(product.price);
@@ -134,13 +135,13 @@ const createOrder = async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Create Order Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   } finally {
     client.release();
   }
 };
 
-const getMyOrders = async (req, res) => {
+const getMyOrders = async (req, res, next) => {
   try {
     const { user_id } = req.user;
     const locationId = req.locationId;
@@ -173,7 +174,7 @@ const getMyOrders = async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error('Get My Orders Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
 

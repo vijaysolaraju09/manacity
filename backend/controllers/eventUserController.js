@@ -1,6 +1,7 @@
 const { pool } = require('../config/db');
+const { createError } = require('../utils/errors');
 
-exports.getAvailableEvents = async (req, res) => {
+exports.getAvailableEvents = async (req, res, next) => {
     try {
         const locationId = req.locationId;
 
@@ -20,11 +21,11 @@ exports.getAvailableEvents = async (req, res) => {
 
     } catch (err) {
         console.error('Error fetching available events:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
     }
 };
 
-exports.registerForEvent = async (req, res) => {
+exports.registerForEvent = async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { eventId } = req.params;
@@ -47,7 +48,7 @@ exports.registerForEvent = async (req, res) => {
 
         if (eventRes.rows.length === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Event not found or unavailable' });
+            return next(createError(404, 'EVENT_NOT_FOUND', 'Event not found or unavailable'));
         }
 
         const event = eventRes.rows[0];
@@ -64,7 +65,7 @@ exports.registerForEvent = async (req, res) => {
         // 3. Check Capacity
         if (approvedCount >= event.capacity) {
             await client.query('ROLLBACK');
-            return res.status(409).json({ error: 'Event is fully booked' });
+            return next(createError(409, 'EVENT_FULL', 'Event is fully booked'));
         }
 
         // 4. Insert Registration
@@ -81,16 +82,16 @@ exports.registerForEvent = async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         if (err.code === '23505') { // Unique violation
-            return res.status(409).json({ error: 'You are already registered for this event' });
+            return next(createError(409, 'EVENT_ALREADY_REGISTERED', 'You are already registered for this event'));
         }
         console.error('Error registering for event:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
     } finally {
         client.release();
     }
 };
 
-exports.getMyEventRegistrations = async (req, res) => {
+exports.getMyEventRegistrations = async (req, res, next) => {
     try {
         const { user_id } = req.user;
         const locationId = req.locationId;
@@ -109,6 +110,6 @@ exports.getMyEventRegistrations = async (req, res) => {
 
     } catch (err) {
         console.error('Error fetching my registrations:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
     }
 };

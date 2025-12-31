@@ -1,6 +1,7 @@
 const { query } = require('../../config/db');
+const { createError } = require('../../utils/errors');
 
-exports.getHomeData = async (req, res) => {
+exports.getHomeData = async (req, res, next) => {
     try {
         const locationId = req.locationId;
 
@@ -71,7 +72,7 @@ exports.getHomeData = async (req, res) => {
         ]);
 
         if (locationRes.rows.length === 0) {
-            return res.status(404).json({ error: 'Location not found' });
+            return next(createError(404, 'LOCATION_NOT_FOUND', 'Location not found'));
         }
 
         res.json({
@@ -85,6 +86,6 @@ exports.getHomeData = async (req, res) => {
 
     } catch (err) {
         console.error('Error fetching mobile home data:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
     }
 };

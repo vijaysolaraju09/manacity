@@ -1,6 +1,7 @@
 const { query } = require('../config/db');
+const { createError } = require('../utils/errors');
 
-const getPendingShops = async (req, res) => {
+const getPendingShops = async (req, res, next) => {
   try {
     const locationId = req.locationId;
 
@@ -16,11 +17,11 @@ const getPendingShops = async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error('Get Pending Shops Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
 
-const approveShop = async (req, res) => {
+const approveShop = async (req, res, next) => {
   try {
     const { shopId } = req.params;
     const locationId = req.locationId;
@@ -33,11 +34,11 @@ const approveShop = async (req, res) => {
     const checkRes = await query(checkSql, [shopId, locationId]);
 
     if (checkRes.rows.length === 0) {
-      return res.status(404).json({ error: 'Shop not found in this location' });
+      return next(createError(404, 'SHOP_NOT_FOUND', 'Shop not found in this location'));
     }
 
     if (checkRes.rows[0].approval_status !== 'PENDING') {
-      return res.status(409).json({ error: 'Shop is not in PENDING status' });
+      return next(createError(409, 'SHOP_STATUS_INVALID', 'Shop is not in PENDING status'));
     }
 
     // 2. Update status
@@ -52,11 +53,11 @@ const approveShop = async (req, res) => {
     res.json(updateRes.rows[0]);
   } catch (err) {
     console.error('Approve Shop Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
 
-const rejectShop = async (req, res) => {
+const rejectShop = async (req, res, next) => {
   try {
     const { shopId } = req.params;
     const { reason } = req.body;
@@ -64,7 +65,7 @@ const rejectShop = async (req, res) => {
 
     // 1. Input Validation
     if (!reason || reason.trim().length < 5) {
-      return res.status(400).json({ error: 'Rejection reason is required (min 5 chars)' });
+      return next(createError(400, 'SHOP_REJECTION_REASON_INVALID', 'Rejection reason is required (min 5 chars)'));
     }
 
     // 2. Validate existence and status within the admin's location
@@ -75,11 +76,11 @@ const rejectShop = async (req, res) => {
     const checkRes = await query(checkSql, [shopId, locationId]);
 
     if (checkRes.rows.length === 0) {
-      return res.status(404).json({ error: 'Shop not found in this location' });
+      return next(createError(404, 'SHOP_NOT_FOUND', 'Shop not found in this location'));
     }
 
     if (checkRes.rows[0].approval_status !== 'PENDING') {
-      return res.status(409).json({ error: 'Shop is not in PENDING status' });
+      return next(createError(409, 'SHOP_STATUS_INVALID', 'Shop is not in PENDING status'));
     }
 
     // 3. Update status
@@ -97,7 +98,7 @@ const rejectShop = async (req, res) => {
     res.json(updateRes.rows[0]);
   } catch (err) {
     console.error('Reject Shop Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
 
