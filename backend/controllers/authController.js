@@ -2,6 +2,7 @@ const { query } = require('../config/db');
 const { generateOtp } = require('../utils/otp');
 const { hashPassword, comparePassword } = require('../utils/password');
 const { generateToken } = require('../utils/jwt');
+const { createError } = require('../utils/errors');
 
 const sendOtp = async (req, res) => {
   try {
@@ -157,7 +158,7 @@ const register = async (req, res) => {
   }
 };
 
-const login = async (req, res) => {
+const login = async (req, res, next) => {
   try {
     const { phone, password } = req.body;
 
@@ -177,30 +178,43 @@ const login = async (req, res) => {
 
     // 1. Validation
     if (!normalizedPhone) {
-      return res.status(400).json({ error: 'Invalid phone number' });
+      return next(createError(400, 'PHONE_INVALID', 'Invalid phone number'));
     }
     if (!password) {
-      return res.status(400).json({ error: 'Phone and password are required' });
+      return next(createError(400, 'PASSWORD_REQUIRED', 'Phone and password are required'));
     }
 
     // 2. Fetch User
     const userQuery = `
-      SELECT id, name, phone, password_hash, role, location_id 
+      SELECT id, name, phone, password_hash, role, location_id, is_active, deleted_at 
       FROM users 
-      WHERE phone = $1 AND is_active = true AND deleted_at IS NULL
+      WHERE phone = $1
     `;
     const { rows } = await query(userQuery, [normalizedPhone]);
-
-    if (rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
     const user = rows[0];
 
-    // 3. Compare Password
-    const isMatch = await comparePassword(password, user.password_hash);
+    if (!user) {
+      return next(createError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid credentials'));
+    }
+
+    if (user.is_active === false || user.deleted_at) {
+      return next(createError(403, 'USER_INACTIVE', 'User is inactive'));
+    }
+
+    if (!user.password_hash) {
+      return next(createError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid credentials'));
+    }
+
+    let isMatch = false;
+    try {
+      isMatch = await comparePassword(password, user.password_hash);
+    } catch (compareErr) {
+      console.error('Login password compare failed:', compareErr);
+      return next(createError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid credentials'));
+    }
+
     if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return next(createError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid credentials'));
     }
 
     // 4. Generate JWT
@@ -224,7 +238,7 @@ const login = async (req, res) => {
     });
   } catch (err) {
     console.error('Login Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
 
