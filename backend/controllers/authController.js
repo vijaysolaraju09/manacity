@@ -162,16 +162,26 @@ const login = async (req, res, next) => {
   try {
     const { phone, password } = req.body;
 
-    // Normalize phone to E.164 with default +91 when missing country code
+    // Normalize phone to E.164 with India-specific defaults
     const normalizePhone = (rawPhone) => {
-      const stringPhone = String(rawPhone ?? '').trim();
+      if (rawPhone === undefined || rawPhone === null) return null;
+
+      const stringPhone = String(rawPhone).replace(/\s+/g, '');
       if (!stringPhone) return null;
 
       if (stringPhone.startsWith('+')) {
-        return /^\+\d{10,15}$/.test(stringPhone) ? stringPhone : null;
+        return stringPhone;
       }
 
-      return /^\d{10}$/.test(stringPhone) ? `+91${stringPhone}` : null;
+      if (/^\d{10}$/.test(stringPhone)) {
+        return `+91${stringPhone}`;
+      }
+
+      if (/^91\d{10}$/.test(stringPhone)) {
+        return `+${stringPhone}`;
+      }
+
+      return null;
     };
 
     const normalizedPhone = normalizePhone(phone);
