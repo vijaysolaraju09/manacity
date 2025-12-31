@@ -42,6 +42,7 @@ const { validateEnv } = require('./utils/env');
 const { query } = require('./config/db');
 const authMiddleware = require('./middlewares/authMiddleware');
 const locationMiddleware = require('./middlewares/locationMiddleware');
+const requestIdMiddleware = require('./middlewares/requestIdMiddleware');
 
 // Validate environment variables
 validateEnv();
@@ -54,6 +55,7 @@ const HOST = process.env.HOST || "127.0.0.1";
 app.set('trust proxy', 1);
 
 // Middleware
+app.use(requestIdMiddleware);
 app.use(helmet());
 app.use(compression());
 
@@ -168,12 +170,33 @@ app.use('/api/mobile/orders', mobileOrderRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  if (process.env.NODE_ENV === 'production') {
-    res.status(500).json({ error: 'Internal Server Error' });
-  } else {
-    res.status(500).json({ error: err.message });
-  }
+  const status = err.statusCode || err.status || 500;
+  const requestId = req.request_id || req.get('X-Request-Id');
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  const response = {
+    error: {
+      code: err.code || 'INTERNAL_ERROR',
+      message: isProduction ? 'Internal Server Error' : err.message || 'Internal Server Error',
+      request_id: requestId,
+    },
+  };
+
+  const logPayload = {
+    level: 'error',
+    request_id: requestId,
+    method: req.method,
+    path: req.originalUrl,
+    status,
+    error_name: err.name,
+    error_message: err.message,
+    user_id: req.user ? req.user.user_id : undefined,
+    location_id: req.user ? req.user.location_id : undefined,
+  };
+
+  console.error(JSON.stringify(logPayload));
+
+  res.status(status).json(response);
 });
 
 // Start server
