@@ -1,33 +1,64 @@
+const { query } = require('../config/db');
 const { createError } = require('../utils/errors');
 
-const locationMiddleware = (req, res, next) => {
+const isUuid = (value) => typeof value === 'string'
+  && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
+const locationMiddleware = async (req, res, next) => {
   // Bypass location enforcement for Swagger docs
   if (req.originalUrl.startsWith('/docs')) {
     return next();
   }
 
-  const locationId = req.locationId;
-  const userLocationStatus = req.user ? req.user.location_status : undefined;
-  const userLocationActive = req.user ? req.user.location_active : undefined;
+  // Allow authMiddleware to control auth enforcement
+  if (!req.user) {
+    return next();
+  }
 
-  // Strictly enforce location context from the authenticated user (JWT)
-  if (locationId === undefined || locationId === null || locationId === '') {
+  const requestId = req.request_id || req.get('X-Request-Id');
+  const locationId = req.user.location_id || req.locationId;
+
+  if (!locationId) {
     return next(createError(400, 'LOCATION_MISSING', 'Location context is required'));
   }
 
-  if (Number.isNaN(Number(locationId))) {
+  const normalizedLocationId = typeof locationId === 'string' ? locationId : String(locationId);
+
+  if (!isUuid(normalizedLocationId)) {
     return next(createError(400, 'LOCATION_INVALID', 'Invalid location context'));
   }
 
-  if (userLocationStatus && userLocationStatus !== 'ACTIVE') {
-    return next(createError(400, 'LOCATION_INACTIVE', 'Location is inactive'));
-  }
+  try {
+    const locationResult = await query(
+      'SELECT id, name, is_active FROM locations WHERE id = $1',
+      [normalizedLocationId],
+    );
 
-  if (userLocationActive === false) {
-    return next(createError(400, 'LOCATION_INACTIVE', 'Location is inactive'));
-  }
+    if (!locationResult || locationResult.rowCount === 0) {
+      return next(createError(400, 'LOCATION_NOT_FOUND', 'Location not found'));
+    }
 
-  next();
+    const location = locationResult.rows[0];
+
+    if (location.is_active === false) {
+      return next(createError(403, 'LOCATION_INACTIVE', 'Location is inactive'));
+    }
+
+    req.locationId = location.id;
+    req.location = location;
+
+    return next();
+  } catch (err) {
+    console.error(JSON.stringify({
+      level: 'error',
+      request_id: requestId,
+      location_id: normalizedLocationId,
+      reason: 'LOCATION_MIDDLEWARE_FAILURE',
+      error_message: err && err.message,
+    }));
+
+    return next(createError(500, 'LOCATION_LOOKUP_FAILED', 'Failed to resolve location'));
+  }
 };
 
 module.exports = locationMiddleware;
