@@ -1,6 +1,7 @@
 const { pool } = require('../config/db');
+const { createError } = require('../utils/errors');
 
-exports.getContestEntries = async (req, res) => {
+exports.getContestEntries = async (req, res, next) => {
     try {
         const { contestId } = req.params;
         const locationId = req.locationId;
@@ -24,11 +25,11 @@ exports.getContestEntries = async (req, res) => {
 
     } catch (err) {
         console.error('Error fetching contest entries:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
     }
 };
 
-exports.voteEntry = async (req, res) => {
+exports.voteEntry = async (req, res, next) => {
     try {
         const { entryId } = req.params;
         const { user_id } = req.user;
@@ -43,17 +44,17 @@ exports.voteEntry = async (req, res) => {
         const entryRes = await pool.query(entryQuery, [entryId, locationId]);
 
         if (entryRes.rows.length === 0) {
-            return res.status(404).json({ error: 'Entry not found' });
+            return next(createError(404, 'CONTEST_ENTRY_NOT_FOUND', 'Entry not found'));
         }
 
         const entry = entryRes.rows[0];
 
         if (entry.approval_status !== 'APPROVED') {
-            return res.status(400).json({ error: 'Entry is not approved' });
+            return next(createError(400, 'CONTEST_ENTRY_NOT_APPROVED', 'Entry is not approved'));
         }
 
         if (entry.participant_id === user_id) {
-            return res.status(403).json({ error: 'You cannot vote for your own entry' });
+            return next(createError(403, 'CONTEST_VOTE_FORBIDDEN_SELF', 'You cannot vote for your own entry'));
         }
 
         // 2. Insert Vote
@@ -67,9 +68,9 @@ exports.voteEntry = async (req, res) => {
 
     } catch (err) {
         if (err.code === '23505') { // Unique violation
-            return res.status(409).json({ error: 'You have already voted for this entry' });
+            return next(createError(409, 'CONTEST_VOTE_DUPLICATE', 'You have already voted for this entry'));
         }
         console.error('Error voting for entry:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
     }
 };

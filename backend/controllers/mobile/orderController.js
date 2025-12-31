@@ -1,7 +1,8 @@
 const { pool } = require('../../config/db');
 const { validateCartItems } = require('../../utils/cartPricing');
+const { createError } = require('../../utils/errors');
 
-exports.createOrder = async (req, res) => {
+exports.createOrder = async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { items, deliveryAddress } = req.body;
@@ -15,12 +16,12 @@ exports.createOrder = async (req, res) => {
 
         if (cartResult.error) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: cartResult.error });
+            return next(createError(400, 'CART_VALIDATION_FAILED', cartResult.error));
         }
 
         if (!cartResult.isShopOpen) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Shop is currently closed' });
+            return next(createError(400, 'SHOP_CLOSED', 'Shop is currently closed'));
         }
 
         const { shopId, total, items: validatedItems } = cartResult;
@@ -63,7 +64,7 @@ exports.createOrder = async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         console.error('Order placement error:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
     } finally {
         client.release();
     }

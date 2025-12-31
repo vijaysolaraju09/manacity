@@ -1,6 +1,7 @@
 const { query } = require('../config/db');
+const { createError } = require('../utils/errors');
 
-const getPublicProducts = async (req, res) => {
+const getPublicProducts = async (req, res, next) => {
   try {
     const locationId = req.locationId;
     const { shopId, search } = req.query;
@@ -36,7 +37,7 @@ const getPublicProducts = async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error('Get Public Products Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
 

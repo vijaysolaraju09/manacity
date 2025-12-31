@@ -1,6 +1,7 @@
 const { query } = require('../../config/db');
+const { createError } = require('../../utils/errors');
 
-exports.getShopProducts = async (req, res) => {
+exports.getShopProducts = async (req, res, next) => {
     try {
         const { shopId } = req.params;
         const locationId = req.locationId;
@@ -14,13 +15,13 @@ exports.getShopProducts = async (req, res) => {
         const shopRes = await query(shopQuery, [shopId, locationId]);
 
         if (shopRes.rows.length === 0) {
-            return res.status(404).json({ error: 'Shop not found' });
+            return next(createError(404, 'SHOP_NOT_FOUND', 'Shop not found'));
         }
 
         const shop = shopRes.rows[0];
 
         if (shop.is_hidden || shop.approval_status !== 'APPROVED') {
-            return res.status(404).json({ error: 'Shop not found or unavailable' });
+            return next(createError(404, 'SHOP_UNAVAILABLE', 'Shop not found or unavailable'));
         }
 
         // 2. Fetch Products
@@ -36,11 +37,11 @@ exports.getShopProducts = async (req, res) => {
 
     } catch (err) {
         console.error('Error fetching shop products:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
     }
 };
 
-exports.getProductDetails = async (req, res) => {
+exports.getProductDetails = async (req, res, next) => {
     try {
         const { productId } = req.params;
         const locationId = req.locationId;
@@ -61,13 +62,13 @@ exports.getProductDetails = async (req, res) => {
         const productRes = await query(productQuery, [productId, locationId]);
 
         if (productRes.rows.length === 0) {
-            return res.status(404).json({ error: 'Product not found' });
+            return next(createError(404, 'PRODUCT_NOT_FOUND', 'Product not found'));
         }
 
         res.json(productRes.rows[0]);
 
     } catch (err) {
         console.error('Error fetching product details:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
     }
 };

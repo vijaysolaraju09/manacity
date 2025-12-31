@@ -1,10 +1,11 @@
 const admin = require('../config/firebase');
+const { createError } = require('../utils/errors');
 
 const verifyFirebaseToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized: Missing or malformed token' });
+    return next(createError(401, 'FIREBASE_TOKEN_MISSING', 'Authorization header missing or malformed'));
   }
 
   const token = authHeader.split(' ')[1];
@@ -16,7 +17,7 @@ const verifyFirebaseToken = async (req, res, next) => {
   } catch (error) {
     // Log error code or message without logging the token itself
     console.error('Firebase token verification failed:', error.code || error.message);
-    return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    return next(createError(401, 'FIREBASE_TOKEN_INVALID', 'Invalid Firebase token'));
   }
 };
 

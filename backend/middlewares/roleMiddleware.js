@@ -5,15 +5,17 @@
  *   requireRole("LOCAL_ADMIN")
  *   requireRole("SUPER_ADMIN", "LOCAL_ADMIN")
  */
+const { createError } = require('../utils/errors');
+
 const requireRole = (...allowedRoles) => {
   return (req, res, next) => {
     // Safety: Ensure authMiddleware has run and populated req.user
     if (!req.user) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return next(createError(401, 'AUTH_REQUIRED', 'Authentication is required'));
     }
 
     if (!req.user.role || !allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Forbidden' });
+      return next(createError(403, 'AUTH_FORBIDDEN', 'Access denied for this role'));
     }
 
     next();

@@ -1,6 +1,7 @@
 const { pool } = require('../config/db');
+const { createError } = require('../utils/errors');
 
-exports.getOpenQuestions = async (req, res) => {
+exports.getOpenQuestions = async (req, res, next) => {
     try {
         const locationId = req.locationId;
 
@@ -19,11 +20,11 @@ exports.getOpenQuestions = async (req, res) => {
 
     } catch (err) {
         console.error('Error fetching open questions:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
     }
 };
 
-exports.answerQuestion = async (req, res) => {
+exports.answerQuestion = async (req, res, next) => {
     try {
         const { questionId } = req.params;
         const { admin_answer } = req.body;
@@ -31,7 +32,7 @@ exports.answerQuestion = async (req, res) => {
         const locationId = req.locationId;
 
         if (!admin_answer || admin_answer.trim().length < 5) {
-            return res.status(400).json({ error: 'Answer must be at least 5 characters long' });
+            return next(createError(400, 'ENQUIRE_ANSWER_INVALID', 'Answer must be at least 5 characters long'));
         }
 
         const query = `
@@ -49,18 +50,18 @@ exports.answerQuestion = async (req, res) => {
         const result = await pool.query(query, [admin_answer, user_id, questionId, locationId]);
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Question not found, already answered, or not in this location' });
+            return next(createError(404, 'ENQUIRE_QUESTION_NOT_FOUND', 'Question not found, already answered, or not in this location'));
         }
 
         res.json(result.rows[0]);
 
     } catch (err) {
         console.error('Error answering question:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
     }
 };
 
-exports.deleteQuestion = async (req, res) => {
+exports.deleteQuestion = async (req, res, next) => {
     try {
         const { questionId } = req.params;
         const locationId = req.locationId;
@@ -77,13 +78,13 @@ exports.deleteQuestion = async (req, res) => {
         const result = await pool.query(query, [questionId, locationId]);
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Question not found' });
+            return next(createError(404, 'ENQUIRE_QUESTION_NOT_FOUND', 'Question not found'));
         }
 
         res.json({ message: 'Question deleted successfully' });
 
     } catch (err) {
         console.error('Error deleting question:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
     }
 };
