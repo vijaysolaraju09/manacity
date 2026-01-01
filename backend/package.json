@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "seed:mobile-shops": "node scripts/seedMobileShops.js",
+    "seed:mobile-shops:rollback": "node scripts/seedMobileShops.js --rollback"
   },
   "keywords": [],
   "author": "",
