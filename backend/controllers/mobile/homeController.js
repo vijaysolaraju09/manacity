@@ -65,6 +65,19 @@ exports.getHomeData = async (req, res, next) => {
   }
 
   try {
+    // Observability: Capture location context used for shops query
+    console.log(JSON.stringify({
+      level: 'info',
+      event: 'MOBILE_HOME_LOCATION_CONTEXT',
+      request_id: requestId,
+      user_id: req.user ? req.user.user_id : null,
+      jwt_location_id: req.user ? req.user.location_id : null,
+      middleware_location_id: req.locationId || null,
+      sql_location_param: locationId,
+      path: req.originalUrl,
+      method: req.method,
+    }));
+
     const [
       shops,
       contests,
