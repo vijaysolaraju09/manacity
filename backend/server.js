@@ -44,6 +44,7 @@ const { query } = require('./config/db');
 const authMiddleware = require('./middlewares/authMiddleware');
 const locationMiddleware = require('./middlewares/locationMiddleware');
 const requestIdMiddleware = require('./middlewares/requestIdMiddleware');
+const mobileNoCacheMiddleware = require('./middlewares/mobileNoCacheMiddleware');
 
 // Validate environment variables
 validateEnv();
@@ -185,6 +186,9 @@ app.use(authMiddleware);
 
 // Global Location Middleware (Ensures JWT contains location_id)
 app.use(locationMiddleware);
+
+// Disable caching and ETag handling for all mobile endpoints
+app.use('/api/mobile', mobileNoCacheMiddleware);
 
 // Protected Routes
 app.use('/api/shops', shopRoutes);
