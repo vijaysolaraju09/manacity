@@ -86,7 +86,7 @@ exports.getHomeData = async (req, res, next) => {
       news,
     ] = await Promise.all([
       safeQuery('shops', `
-                SELECT id, name, category, is_open 
+                SELECT id, name, description, is_open, created_at, NULL::text AS category 
                 FROM shops 
                 WHERE location_id = $1 
                   AND approval_status = 'APPROVED' 
@@ -105,27 +105,27 @@ exports.getHomeData = async (req, res, next) => {
                 LIMIT 3
             `, [locationId]),
       safeQuery('events', `
-                SELECT id, title, starts_at, location_name 
+                SELECT id, title, event_date AS starts_at, venue AS location_name 
                 FROM events 
                 WHERE location_id = $1 
                   AND deleted_at IS NULL 
-                  AND starts_at >= NOW()
-                ORDER BY starts_at ASC 
+                  AND event_date >= NOW()
+                ORDER BY event_date ASC 
                 LIMIT 3
             `, [locationId]),
       safeQuery('services', `
-                SELECT id, name 
+                SELECT id, name, description, is_active, created_at 
                 FROM service_categories 
                 WHERE location_id = $1 
                   AND is_active = true 
                 ORDER BY name ASC
             `, [locationId]),
       safeQuery('news', `
-                SELECT id, title, published_at 
+                SELECT id, title, body, created_at AS published_at 
                 FROM local_news 
                 WHERE location_id = $1 
-                  AND is_published = true 
-                ORDER BY published_at DESC 
+                  AND deleted_at IS NULL 
+                ORDER BY created_at DESC 
                 LIMIT 5
             `, [locationId]),
     ]);
