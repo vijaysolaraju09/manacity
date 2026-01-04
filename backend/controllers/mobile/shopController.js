@@ -1,18 +1,14 @@
 const { query } = require('../../config/db');
+const { buildShopDetailQueries } = require('./mobileQueryBuilder');
 
 exports.getShopDetails = async (req, res) => {
     try {
         const { shopId } = req.params;
         const locationId = req.locationId;
 
+        const { shopQuery, productsQuery } = await buildShopDetailQueries();
+
         // 1. Fetch Shop
-        const shopQuery = `
-            SELECT id, name, description, address, phone, image_url, 
-                   category, is_open, delivery_enabled, pickup_enabled, 
-                   approval_status, is_hidden
-            FROM shops
-            WHERE id = $1 AND location_id = $2
-        `;
         const shopRes = await query(shopQuery, [shopId, locationId]);
 
         if (shopRes.rows.length === 0) {
@@ -32,12 +28,6 @@ exports.getShopDetails = async (req, res) => {
         }
 
         // 4. Fetch Products
-        const productsQuery = `
-            SELECT id, name, description, price, image_url, is_available
-            FROM products
-            WHERE shop_id = $1 AND deleted_at IS NULL
-            ORDER BY name ASC
-        `;
         const productsRes = await query(productsQuery, [shopId]);
 
         // 5. Compute can_order

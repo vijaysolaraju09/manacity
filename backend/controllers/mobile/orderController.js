@@ -24,31 +24,44 @@ exports.createOrder = async (req, res, next) => {
             return next(createError(400, 'SHOP_CLOSED', 'Shop is currently closed'));
         }
 
-        const { shopId, total, items: validatedItems } = cartResult;
+        const { shopId, total, subtotal, deliveryFee, items: validatedItems } = cartResult;
 
         // 2. Insert Order
         const orderSql = `
             INSERT INTO orders (
-                user_id, shop_id, location_id, total_amount, status, 
+                user_id, shop_id, location_id, subtotal, delivery_fee, total, status,
                 payment_method, delivery_address, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, 'PENDING', 'COD', $5, NOW(), NOW())
-            RETURNING id
+            ) VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', 'COD', $7, NOW(), NOW())
+            RETURNING id, status, total
         `;
         
         const orderRes = await client.query(orderSql, [
-            userId, shopId, locationId, total, deliveryAddress
+            userId,
+            shopId,
+            locationId,
+            subtotal,
+            deliveryFee,
+            total,
+            deliveryAddress
         ]);
         const orderId = orderRes.rows[0].id;
 
         // 3. Insert Order Items (Snapshotting price and name)
         const itemSql = `
-            INSERT INTO order_items (order_id, product_id, quantity, price, product_name)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO order_items (order_id, product_id, shop_id, location_id, quantity, price_snapshot, name_snapshot, line_total)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `;
 
         for (const item of validatedItems) {
             await client.query(itemSql, [
-                orderId, item.productId, item.quantity, item.price, item.name
+                orderId,
+                item.productId,
+                shopId,
+                locationId,
+                item.quantity,
+                item.price,
+                item.name,
+                item.total
             ]);
         }
 
@@ -57,8 +70,10 @@ exports.createOrder = async (req, res, next) => {
         res.status(201).json({
             message: 'Order placed successfully',
             orderId,
+            subtotal,
+            delivery_fee: deliveryFee,
             total,
-            status: 'PENDING'
+            status: orderRes.rows[0].status || 'PENDING'
         });
 
     } catch (err) {

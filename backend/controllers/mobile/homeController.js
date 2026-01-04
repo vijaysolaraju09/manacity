@@ -1,5 +1,6 @@
 const { query } = require('../../config/db');
 const { createError } = require('../../utils/errors');
+const { buildHomeQueries } = require('./mobileQueryBuilder');
 
 const buildLogPayload = ({ requestId, locationId, section, reason, error }) => ({
   level: 'error',
@@ -78,6 +79,14 @@ exports.getHomeData = async (req, res, next) => {
       method: req.method,
     }));
 
+    const {
+      shopsQuery,
+      contestsQuery,
+      eventsQuery,
+      servicesQuery,
+      newsQuery,
+    } = await buildHomeQueries();
+
     const [
       shops,
       contests,
@@ -85,49 +94,11 @@ exports.getHomeData = async (req, res, next) => {
       services,
       news,
     ] = await Promise.all([
-      safeQuery('shops', `
-                SELECT id, name, description, is_open, created_at, NULL::text AS category 
-                FROM shops 
-                WHERE location_id = $1 
-                  AND approval_status = 'APPROVED' 
-                  AND is_hidden = false 
-                ORDER BY is_open DESC, created_at DESC 
-                LIMIT 10
-            `, [locationId]),
-      safeQuery('contests', `
-                SELECT id, title, starts_at, ends_at 
-                FROM contests 
-                WHERE location_id = $1 
-                  AND is_active = true 
-                  AND deleted_at IS NULL 
-                  AND starts_at <= NOW() 
-                  AND ends_at >= NOW()
-                LIMIT 3
-            `, [locationId]),
-      safeQuery('events', `
-                SELECT id, title, event_date AS starts_at, venue AS location_name 
-                FROM events 
-                WHERE location_id = $1 
-                  AND deleted_at IS NULL 
-                  AND event_date >= NOW()
-                ORDER BY event_date ASC 
-                LIMIT 3
-            `, [locationId]),
-      safeQuery('services', `
-                SELECT id, name, description, is_active, created_at 
-                FROM service_categories 
-                WHERE location_id = $1 
-                  AND is_active = true 
-                ORDER BY name ASC
-            `, [locationId]),
-      safeQuery('news', `
-                SELECT id, title, body, created_at AS published_at 
-                FROM local_news 
-                WHERE location_id = $1 
-                  AND deleted_at IS NULL 
-                ORDER BY created_at DESC 
-                LIMIT 5
-            `, [locationId]),
+      safeQuery('shops', shopsQuery, [locationId]),
+      safeQuery('contests', contestsQuery, [locationId]),
+      safeQuery('events', eventsQuery, [locationId]),
+      safeQuery('services', servicesQuery, [locationId]),
+      safeQuery('news', newsQuery, [locationId]),
     ]);
 
     res.json({
