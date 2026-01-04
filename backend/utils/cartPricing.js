@@ -1,3 +1,5 @@
+const { buildCartValidationQuery } = require('../controllers/mobile/mobileQueryBuilder');
+
 exports.validateCartItems = async (items, locationId, dbQuery) => {
     if (!items || !Array.isArray(items) || items.length === 0) {
         return { error: 'Cart is empty' };
@@ -6,14 +8,7 @@ exports.validateCartItems = async (items, locationId, dbQuery) => {
     // Extract unique IDs
     const productIds = [...new Set(items.map(i => i.productId))];
 
-    const sql = `
-        SELECT p.id, p.name, p.price, p.is_available, p.shop_id, 
-               s.name as shop_name, s.location_id, s.approval_status, s.is_hidden, s.is_open
-        FROM products p
-        JOIN shops s ON p.shop_id = s.id
-        WHERE p.id = ANY($1::uuid[])
-          AND p.deleted_at IS NULL
-    `;
+    const sql = await buildCartValidationQuery();
 
     const { rows: products } = await dbQuery(sql, [productIds]);
     const productMap = new Map(products.map(p => [p.id, p]));
@@ -31,8 +26,10 @@ exports.validateCartItems = async (items, locationId, dbQuery) => {
             return { error: `Product ${item.productId} not found or unavailable` };
         }
 
+        const productLocationId = product.product_location_id || product.location_id;
+
         // 2. Validate Location
-        if (product.location_id !== locationId) {
+        if (productLocationId !== locationId) {
             return { error: 'Products must belong to the current location' };
         }
 
@@ -67,12 +64,17 @@ exports.validateCartItems = async (items, locationId, dbQuery) => {
             name: product.name,
             price: price,
             quantity: quantity,
-            total: lineTotal
+            total: lineTotal,
+            shopId: product.shop_id,
+            locationId: productLocationId,
         });
     }
 
     // Check if shop is open (using the first product's shop info)
     const isShopOpen = products.length > 0 ? products[0].is_open : false;
 
-    return { valid: true, shopId, shopName, isShopOpen, items: validatedItems, subtotal, total: subtotal };
+    const deliveryFee = products.length > 0 ? parseFloat(products[0].delivery_fee || 0) : 0;
+    const total = subtotal + deliveryFee;
+
+    return { valid: true, shopId, shopName, isShopOpen, items: validatedItems, subtotal, total, deliveryFee };
 };

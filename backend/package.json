@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "seed:mobile-shops": "node scripts/seedMobileShops.js",
-    "seed:mobile-shops:rollback": "node scripts/seedMobileShops.js --rollback"
+    "seed:mobile-shops:rollback": "node scripts/seedMobileShops.js --rollback",
+    "validate:mobile-queries": "node scripts/validateMobileQueries.js"
   },
   "keywords": [],
   "author": "",
