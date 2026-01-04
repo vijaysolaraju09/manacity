@@ -4,19 +4,19 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const { pool, query } = require('../config/db');
 const { hashPassword, comparePassword } = require('../utils/password');
 
-const LOCATION_NAME = 'Rayachoti';
+const LOCATION_NAME = 'Rayachoty';
 
 const USER_DEFINITIONS = [
   {
     key: 'SUPER_ADMIN',
-    name: 'Rayachoti Super Admin',
+    name: 'Rayachoty Super Admin',
     phone: '+919999000001',
     password: 'Admin@123',
     role: 'SUPER_ADMIN',
   },
   {
     key: 'LOCAL_ADMIN',
-    name: 'Rayachoti Local Admin',
+    name: 'Rayachoty Local Admin',
     phone: '+919999000002',
     password: 'Admin@123',
     role: 'LOCAL_ADMIN',
@@ -53,7 +53,7 @@ const USER_DEFINITIONS = [
 
 const SHOP_DEFINITIONS = [
   {
-    name: 'Fresh Mart Rayachoti',
+    name: 'Fresh Mart Rayachoty',
     description: 'Daily groceries and essentials',
     delivery_fee: 30,
     ownerPhone: '+919999000003',
@@ -67,7 +67,7 @@ const SHOP_DEFINITIONS = [
     ],
   },
   {
-    name: 'Rayachoti Veg Corner',
+    name: 'Rayachoty Veg Corner',
     description: 'Fresh vegetables and fruits',
     delivery_fee: 20,
     ownerPhone: '+919999000004',
@@ -93,7 +93,7 @@ const EVENTS = [
     title: 'Educational',
     description: 'Community workshop on digital literacy and safety.',
     event_type: 'EDUCATIONAL',
-    venue: 'Rayachoti Community Hall',
+    venue: 'Rayachoty Community Hall',
     capacity: 150,
     daysFromNow: 10,
   },
@@ -101,21 +101,21 @@ const EVENTS = [
     title: 'Festival',
     description: 'Local festival celebration with food stalls and music.',
     event_type: 'FESTIVAL',
-    venue: 'Rayachoti Main Grounds',
+    venue: 'Rayachoty Main Grounds',
     capacity: 300,
     daysFromNow: 20,
   },
 ];
 
 const CONTEST = {
-  title: 'Rayachoti New Year Contest',
+  title: 'Rayachoty New Year Contest',
   description: 'Celebrate the new year with community highlights and prizes.',
   duration: { startOffsetDays: -1, endOffsetDays: 7 },
 };
 
 const LOCAL_NEWS = [
   {
-    title: 'Rayachoti Sanitation Drive',
+    title: 'Rayachoty Sanitation Drive',
     body: 'Municipality launches a week-long sanitation drive across all wards.',
   },
   {
