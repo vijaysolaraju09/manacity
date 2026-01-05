@@ -29,8 +29,17 @@ exports.createOrder = async (req, res, next) => {
         // 2. Insert Order
         const orderSql = `
             INSERT INTO orders (
-                user_id, shop_id, location_id, subtotal, delivery_fee, total, status,
-                payment_method, delivery_address, created_at, updated_at
+                user_id,
+                shop_id,
+                location_id,
+                subtotal,
+                delivery_fee,
+                total,
+                status,
+                payment_method,
+                delivery_address,
+                created_at,
+                updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', 'COD', $7, NOW(), NOW())
             RETURNING id, status, total
         `;
