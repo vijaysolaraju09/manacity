@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getPendingOrders, acceptOrder, rejectOrder, deliverOrder } = require('../controllers/orderAdminController');
-const { getReceivedOrders } = require('../controllers/shopOrderController');
+const { getReceivedOrders, getOrderDetailsForBusiness } = require('../controllers/shopOrderController');
 const requireRole = require('../middlewares/roleMiddleware');
 const ROLES = require('../utils/roles');
 
@@ -30,6 +30,9 @@ router.get('/pending', requireRole(ROLES.USER, ROLES.BUSINESS), getPendingOrders
 
 // GET /api/shop/orders/received
 router.get('/received', requireRole(ROLES.BUSINESS), getReceivedOrders);
+
+// GET /api/shop/orders/:orderId
+router.get('/:orderId', requireRole(ROLES.BUSINESS), getOrderDetailsForBusiness);
 
 // POST /api/shop/orders/:orderId/accept
 /**
