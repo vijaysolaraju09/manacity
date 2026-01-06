@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getPendingOrders, acceptOrder, rejectOrder, deliverOrder } = require('../controllers/orderAdminController');
+const { getReceivedOrders } = require('../controllers/shopOrderController');
 const requireRole = require('../middlewares/roleMiddleware');
 const ROLES = require('../utils/roles');
 
@@ -26,6 +27,9 @@ const ROLES = require('../utils/roles');
  *         $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/pending', requireRole(ROLES.USER, ROLES.BUSINESS), getPendingOrders);
+
+// GET /api/shop/orders/received
+router.get('/received', requireRole(ROLES.BUSINESS), getReceivedOrders);
 
 // POST /api/shop/orders/:orderId/accept
 /**
