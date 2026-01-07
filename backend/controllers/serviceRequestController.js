@@ -329,7 +329,7 @@ exports.getMyRequests = async (req, res) => {
         const countRes = await query(countQuery, [locationId, user_id]);
         const total = countRes.rows[0].total;
 
-        const query = `
+        const requestsQuery = `
             SELECT sr.*, sc.name as category_name
             FROM service_requests sr
             LEFT JOIN service_categories sc ON sr.category_id = sc.id
@@ -339,7 +339,7 @@ exports.getMyRequests = async (req, res) => {
             LIMIT $3 OFFSET $4
         `;
 
-        const result = await query(query, [locationId, user_id, limit, offset]);
+        const result = await query(requestsQuery, [locationId, user_id, limit, offset]);
         res.json({
             data: result.rows,
             pagination: {
