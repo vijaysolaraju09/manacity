@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { applyShop } = require('../controllers/shopController');
+const { applyShop, getMyShop } = require('../controllers/shopController');
 const requireRole = require('../middlewares/roleMiddleware');
 const ROLES = require('../utils/roles');
 
@@ -50,5 +50,6 @@ const ROLES = require('../utils/roles');
  *         $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/apply', requireRole(ROLES.USER, ROLES.BUSINESS), applyShop);
+router.get('/my', requireRole(ROLES.BUSINESS), getMyShop);
 
 module.exports = router;
