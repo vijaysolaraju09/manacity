@@ -260,7 +260,7 @@ exports.getPublicRequests = async (req, res) => {
         const countRes = await query(countQuery, [locationId]);
         const total = countRes.rows[0].total;
 
-        const query = `
+        const publicRequestsQuery = `
             SELECT sr.id, sr.request_text, sr.created_at, sr.expires_at, u.name as requester_name
             FROM service_requests sr
             JOIN users u ON sr.requester_id = u.id
@@ -272,7 +272,7 @@ exports.getPublicRequests = async (req, res) => {
             LIMIT $2 OFFSET $3
         `;
 
-        const result = await query(query, [locationId, limit, offset]);
+        const result = await query(publicRequestsQuery, [locationId, limit, offset]);
         
         res.json({
             data: result.rows,
@@ -329,7 +329,7 @@ exports.getMyRequests = async (req, res) => {
         const countRes = await query(countQuery, [locationId, user_id]);
         const total = countRes.rows[0].total;
 
-        const query = `
+        const requestsQuery = `
             SELECT sr.*, sc.name as category_name
             FROM service_requests sr
             LEFT JOIN service_categories sc ON sr.category_id = sc.id
@@ -339,7 +339,7 @@ exports.getMyRequests = async (req, res) => {
             LIMIT $3 OFFSET $4
         `;
 
-        const result = await query(query, [locationId, user_id, limit, offset]);
+        const result = await query(requestsQuery, [locationId, user_id, limit, offset]);
         res.json({
             data: result.rows,
             pagination: {
