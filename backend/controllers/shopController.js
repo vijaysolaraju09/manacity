@@ -1,6 +1,49 @@
 const { query } = require('../config/db');
 const { createError } = require('../utils/errors');
 
+const ROLES = require('../utils/roles');
+
+const getMyShop = async (req, res, next) => {
+  try {
+    if (!req.user || req.user.role !== ROLES.BUSINESS) {
+      return next(createError(403, 'AUTH_FORBIDDEN', 'Access denied for this role'));
+    }
+
+    const ownerId = req.user.user_id || req.user.id;
+    const locationId = req.user.location_id || req.locationId;
+
+    const shopQuery = `
+      SELECT *
+      FROM shops
+      WHERE
+        owner_id = $1
+        AND location_id = $2
+        AND deleted_at IS NULL
+      LIMIT 1;
+    `;
+
+    const { rows } = await query(shopQuery, [ownerId, locationId]);
+
+    if (!rows || rows.length === 0) {
+      return next(createError(404, 'SHOP_NOT_FOUND', 'Shop not found'));
+    }
+
+    const shop = rows[0];
+
+    res.json({
+      id: shop.id,
+      name: shop.name,
+      description: shop.description,
+      is_open: shop.is_open,
+      approval_status: shop.approval_status,
+      created_at: shop.created_at,
+    });
+  } catch (err) {
+    console.error('Get My Shop Error:', err);
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
+  }
+};
+
 const applyShop = async (req, res, next) => {
   try {
     const { name, description } = req.body;
@@ -40,4 +83,4 @@ const applyShop = async (req, res, next) => {
   }
 };
 
-module.exports = { applyShop };
+module.exports = { applyShop, getMyShop };
