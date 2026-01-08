@@ -33,13 +33,13 @@ exports.createContest = async (req, res) => {
             return res.status(400).json({ error: 'ends_at must be in the future' });
         }
 
-        const query = `
+        const sql = `
             INSERT INTO contests (location_id, title, description, starts_at, ends_at, created_by, is_active)
             VALUES ($1, $2, $3, $4, $5, $6, true)
             RETURNING *
         `;
 
-        const result = await query(query, [locationId, title, description, starts_at, ends_at, user_id]);
+        const result = await query(sql, [locationId, title, description, starts_at, ends_at, user_id]);
         res.status(201).json(result.rows[0]);
 
     } catch (err) {
@@ -52,13 +52,13 @@ exports.getContestsAdmin = async (req, res) => {
     try {
         const locationId = req.locationId;
 
-        const query = `
+        const sql = `
             SELECT * FROM contests
             WHERE location_id = $1 AND deleted_at IS NULL
             ORDER BY created_at DESC
         `;
 
-        const result = await query(query, [locationId]);
+        const result = await query(sql, [locationId]);
         res.json(result.rows);
 
     } catch (err) {
@@ -118,14 +118,14 @@ exports.updateContest = async (req, res) => {
         values.push(contestId);
         values.push(locationId);
 
-        const query = `
+        const sql = `
             UPDATE contests
             SET ${fieldsToUpdate.join(', ')}
             WHERE id = $${idx} AND location_id = $${idx + 1} AND deleted_at IS NULL
             RETURNING *
         `;
 
-        const result = await query(query, values);
+        const result = await query(sql, values);
 
         res.json(result.rows[0]);
 
@@ -140,14 +140,14 @@ exports.deleteContest = async (req, res) => {
         const { contestId } = req.params;
         const locationId = req.locationId;
 
-        const query = `
+        const sql = `
             UPDATE contests
             SET deleted_at = NOW()
             WHERE id = $1 AND location_id = $2 AND deleted_at IS NULL
             RETURNING id
         `;
 
-        const result = await query(query, [contestId, locationId]);
+        const result = await query(sql, [contestId, locationId]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Contest not found' });
@@ -165,7 +165,7 @@ exports.getPendingEntries = async (req, res) => {
     try {
         const locationId = req.locationId;
 
-        const query = `
+        const sql = `
             SELECT ce.*, c.title as contest_title
             FROM contest_entries ce
             JOIN contests c ON ce.contest_id = c.id
@@ -173,7 +173,7 @@ exports.getPendingEntries = async (req, res) => {
             ORDER BY ce.created_at ASC
         `;
 
-        const result = await query(query, [locationId]);
+        const result = await query(sql, [locationId]);
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching pending entries:', err);
@@ -186,14 +186,14 @@ exports.approveEntry = async (req, res) => {
         const { entryId } = req.params;
         const locationId = req.locationId;
 
-        const query = `
+        const sql = `
             UPDATE contest_entries
             SET approval_status = 'APPROVED', approved_at = NOW()
             WHERE id = $1 AND location_id = $2 AND approval_status = 'PENDING'
             RETURNING *
         `;
 
-        const result = await query(query, [entryId, locationId]);
+        const result = await query(sql, [entryId, locationId]);
 
         if (result.rows.length === 0) {
             const check = await query('SELECT id, approval_status FROM contest_entries WHERE id = $1 AND location_id = $2', [entryId, locationId]);
@@ -233,14 +233,14 @@ exports.rejectEntry = async (req, res) => {
         const locationId = req.locationId;
 
         // Note: rejected_at column does not exist in schema, so we only update status
-        const query = `
+        const sql = `
             UPDATE contest_entries
             SET approval_status = 'REJECTED'
             WHERE id = $1 AND location_id = $2 AND approval_status = 'PENDING'
             RETURNING *
         `;
 
-        const result = await query(query, [entryId, locationId]);
+        const result = await query(sql, [entryId, locationId]);
 
         if (result.rows.length === 0) {
             const check = await query('SELECT id, approval_status FROM contest_entries WHERE id = $1 AND location_id = $2', [entryId, locationId]);

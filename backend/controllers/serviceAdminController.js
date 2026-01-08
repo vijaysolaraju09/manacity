@@ -189,7 +189,7 @@ exports.getAllRequests = async (req, res) => {
         const countRes = await query(countQuery, [locationId]);
         const total = countRes.rows[0].total;
 
-        const query = `
+        const dataQuery = `
             SELECT 
                 sr.id, sr.request_text, sr.status, sr.created_at, sr.expires_at, sr.is_public,
                 u.name as requester_name, u.phone as requester_phone,
@@ -204,7 +204,7 @@ exports.getAllRequests = async (req, res) => {
             LIMIT $2 OFFSET $3
         `;
 
-        const result = await query(query, [locationId, limit, offset]);
+        const result = await query(dataQuery, [locationId, limit, offset]);
 
         res.json({
             data: result.rows,
