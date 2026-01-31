@@ -38,6 +38,7 @@ const PRODUCT_LISTING_COLUMNS = [
   'image_url',
   'is_available',
   'category_id',
+  'stock_quantity',
 ];
 
 const PRODUCT_DETAIL_COLUMNS = [
@@ -49,6 +50,7 @@ const PRODUCT_DETAIL_COLUMNS = [
   'image_url',
   'is_available',
   'category_id',
+  'stock_quantity',
 ];
 
 const CART_PRODUCT_COLUMNS = [

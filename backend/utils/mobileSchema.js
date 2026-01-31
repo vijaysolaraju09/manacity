@@ -18,6 +18,7 @@ const TABLE_FALLBACKS = {
   products: {
     image_url: 'NULL::text',
     category_id: 'NULL::uuid',
+    stock_quantity: '0::int',
     location_id: 'NULL::uuid',
     shop_id: 'NULL::uuid',
   },
