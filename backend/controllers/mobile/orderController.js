@@ -5,7 +5,7 @@ const { createError } = require('../../utils/errors');
 exports.createOrder = async (req, res, next) => {
     const client = await pool.connect();
     try {
-        const { items, deliveryAddress } = req.body;
+        const { items, deliveryAddress, addressId } = req.body;
         const locationId = req.locationId;
         const userId = req.user.user_id;
 
@@ -26,6 +26,31 @@ exports.createOrder = async (req, res, next) => {
 
         const { shopId, total, subtotal, deliveryFee, items: validatedItems } = cartResult;
 
+        let resolvedDeliveryAddress = deliveryAddress;
+        let resolvedAddressId = null;
+
+        if (addressId) {
+            const addressRes = await client.query(
+                `
+                SELECT id, address_line
+                FROM addresses
+                WHERE id = $1
+                  AND user_id = $2
+                  AND location_id = $3
+                  AND deleted_at IS NULL
+                `,
+                [addressId, userId, locationId]
+            );
+
+            if (addressRes.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return next(createError(404, 'ADDRESS_NOT_FOUND', 'Address not found'));
+            }
+
+            resolvedDeliveryAddress = addressRes.rows[0].address_line;
+            resolvedAddressId = addressRes.rows[0].id;
+        }
+
         // 2. Insert Order
         const orderSql = `
             INSERT INTO orders (
@@ -38,9 +63,10 @@ exports.createOrder = async (req, res, next) => {
                 status,
                 payment_method,
                 delivery_address,
+                address_id,
                 created_at,
                 updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', 'COD', $7, NOW(), NOW())
+            ) VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', 'COD', $7, $8, NOW(), NOW())
             RETURNING id, status, total
         `;
         
@@ -51,7 +77,8 @@ exports.createOrder = async (req, res, next) => {
             subtotal,
             deliveryFee,
             total,
-            deliveryAddress
+            resolvedDeliveryAddress,
+            resolvedAddressId
         ]);
         const orderId = orderRes.rows[0].id;
 
