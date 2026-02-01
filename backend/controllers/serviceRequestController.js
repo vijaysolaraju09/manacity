@@ -4,15 +4,17 @@ const { parseLimit, parseCursor, makeNextCursor } = require('../utils/pagination
 
 exports.createTypeARequest = async (req, res) => {
     try {
-        const { category_id, request_text } = req.body;
+        const { category_id, request_text, title, description, note } = req.body;
         const { user_id } = req.user;
         const locationId = req.locationId;
+        const resolvedDescription = description || request_text;
+        const resolvedRequestText = request_text || description;
 
         // 1. Validate inputs
         if (!category_id) {
             return res.status(400).json({ error: 'category_id is required' });
         }
-        if (!request_text || request_text.trim().length < 5) {
+        if (!resolvedDescription || resolvedDescription.trim().length < 5) {
             return res.status(400).json({ error: 'request_text must be at least 5 characters long' });
         }
 
@@ -52,13 +54,22 @@ exports.createTypeARequest = async (req, res) => {
         const insertQuery = `
             INSERT INTO service_requests (
                 location_id, requester_id, category_id, request_text,
+                title, description, note,
                 is_public, status, expires_at
             )
-            VALUES ($1, $2, $3, $4, false, 'OPEN', NOW() + INTERVAL '24 hours')
+            VALUES ($1, $2, $3, $4, $5, $6, $7, false, 'OPEN', NOW() + INTERVAL '24 hours')
             RETURNING *
         `;
         
-        const result = await query(insertQuery, [locationId, user_id, category_id, request_text]);
+        const result = await query(insertQuery, [
+            locationId,
+            user_id,
+            category_id,
+            resolvedRequestText,
+            title || null,
+            resolvedDescription,
+            note || null
+        ]);
         res.status(201).json(result.rows[0]);
 
     } catch (err) {
@@ -75,7 +86,7 @@ exports.getOffersForMyRequest = async (req, res) => {
 
         // Verify ownership
         const requestQuery = `
-            SELECT id, status, assigned_user_id
+            SELECT id, status, assigned_user_id, assigned_provider_user_id
             FROM service_requests
             WHERE id = $1 AND location_id = $2 AND requester_id = $3
         `;
@@ -86,11 +97,12 @@ exports.getOffersForMyRequest = async (req, res) => {
         }
 
         const request = requestRes.rows[0];
-        const isAssigned = request.status === 'ASSIGNED' || request.status === 'COMPLETED';
+        const assignedProviderId = request.assigned_provider_user_id || request.assigned_user_id;
+        const isAssigned = ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'ACCEPTED'].includes(request.status);
 
         // Fetch offers
         const offersQuery = `
-            SELECT so.id, so.request_id, so.provider_user_id, so.message, so.created_at,
+            SELECT so.id, so.request_id, so.provider_user_id, so.message, so.created_at, so.offer_status,
                    u.name as provider_name, u.phone as provider_phone
             FROM service_offers so
             JOIN users u ON so.provider_user_id = u.id
@@ -101,7 +113,7 @@ exports.getOffersForMyRequest = async (req, res) => {
 
         const offers = offersRes.rows.map(offer => {
             // Only show phone if this specific provider is the one assigned to the request
-            const showPhone = isAssigned && (offer.provider_user_id === request.assigned_user_id);
+            const showPhone = isAssigned && (offer.provider_user_id === assignedProviderId);
             return {
                 ...offer,
                 provider_phone: showPhone ? offer.provider_phone : null
@@ -122,57 +134,171 @@ exports.acceptOffer = async (req, res) => {
         const { user_id } = req.user;
         const locationId = req.locationId;
 
+        await query('BEGIN');
+
+        const requestQuery = `
+            SELECT id, requester_id, status, expires_at, is_public
+            FROM service_requests
+            WHERE id = $1 AND location_id = $2 AND requester_id = $3
+            FOR UPDATE
+        `;
+        const requestRes = await query(requestQuery, [requestId, locationId, user_id]);
+
+        if (requestRes.rows.length === 0) {
+            await query('ROLLBACK');
+            return res.status(404).json({ error: 'Request not found' });
+        }
+
+        const request = requestRes.rows[0];
+        if (!request.is_public) {
+            await query('ROLLBACK');
+            return res.status(409).json({ error: 'Request is not public' });
+        }
+        if (!['OPEN', 'OFFERED'].includes(request.status)) {
+            await query('ROLLBACK');
+            return res.status(409).json({ error: `Request is not open for offers (Status: ${request.status})` });
+        }
+        if (new Date(request.expires_at) <= new Date()) {
+            await query('ROLLBACK');
+            return res.status(409).json({ error: 'Request has expired' });
+        }
+
         // 1. Get provider_user_id from offer
-        const offerQuery = `SELECT provider_user_id FROM service_offers WHERE id = $1 AND request_id = $2`;
+        const offerQuery = `
+            SELECT id, provider_user_id, offer_status
+            FROM service_offers
+            WHERE id = $1 AND request_id = $2
+            FOR UPDATE
+        `;
         const offerRes = await query(offerQuery, [offerId, requestId]);
 
         if (offerRes.rows.length === 0) {
+            await query('ROLLBACK');
             return res.status(404).json({ error: 'Offer not found for this request' });
         }
-        const providerUserId = offerRes.rows[0].provider_user_id;
 
-        // 2. Atomic Update
+        const offer = offerRes.rows[0];
+        if (offer.offer_status && offer.offer_status !== 'PENDING') {
+            await query('ROLLBACK');
+            return res.status(409).json({ error: 'Offer is not pending' });
+        }
+
+        const providerUserId = offer.provider_user_id;
+
+        // 2. Update offers
+        await query(
+            `UPDATE service_offers SET offer_status = 'ACCEPTED' WHERE id = $1`,
+            [offerId]
+        );
+        await query(
+            `UPDATE service_offers SET offer_status = 'REJECTED' WHERE request_id = $1 AND id <> $2 AND offer_status = 'PENDING'`,
+            [requestId, offerId]
+        );
+
+        // 3. Update request assignment
         const updateQuery = `
             UPDATE service_requests
-            SET assigned_user_id = $1, status = 'ACCEPTED', updated_at = NOW()
-            WHERE id = $2 
-              AND location_id = $3 
-              AND requester_id = $4 
-              AND status = 'OPEN'
-              AND is_public = true
-              AND expires_at > NOW()
+            SET assigned_provider_user_id = $1,
+                assigned_user_id = $1,
+                status = 'ASSIGNED',
+                updated_at = NOW(),
+                assigned_at = NOW()
+            WHERE id = $2 AND location_id = $3 AND requester_id = $4
             RETURNING *
         `;
         const updateRes = await query(updateQuery, [providerUserId, requestId, locationId, user_id]);
 
-        if (updateRes.rows.length === 0) {
-            // Error handling: determine why it failed
-            const check = await query('SELECT id, requester_id, status, expires_at, is_public FROM service_requests WHERE id = $1 AND location_id = $2', [requestId, locationId]);
-            if (check.rows.length === 0) return res.status(404).json({ error: 'Request not found' });
-            
-            const r = check.rows[0];
-            if (r.requester_id !== user_id) return res.status(403).json({ error: 'You do not own this request' });
-            if (r.status !== 'OPEN') return res.status(409).json({ error: `Request is not OPEN (Status: ${r.status})` });
-            if (!r.is_public) return res.status(409).json({ error: 'Request is not public' });
-            if (new Date(r.expires_at) <= new Date()) return res.status(409).json({ error: 'Request has expired' });
-            return res.status(409).json({ error: 'Unable to accept offer' });
-        }
-
+        await query('COMMIT');
         res.json(updateRes.rows[0]);
 
     } catch (err) {
+        await query('ROLLBACK');
         console.error('Error accepting offer:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+exports.rejectOffer = async (req, res) => {
+    try {
+        const { requestId, offerId } = req.params;
+        const { user_id } = req.user;
+        const locationId = req.locationId;
+
+        await query('BEGIN');
+
+        const requestQuery = `
+            SELECT id, requester_id, status, is_public
+            FROM service_requests
+            WHERE id = $1 AND location_id = $2 AND requester_id = $3
+            FOR UPDATE
+        `;
+        const requestRes = await query(requestQuery, [requestId, locationId, user_id]);
+
+        if (requestRes.rows.length === 0) {
+            await query('ROLLBACK');
+            return res.status(404).json({ error: 'Request not found' });
+        }
+
+        const offerQuery = `
+            SELECT id, offer_status
+            FROM service_offers
+            WHERE id = $1 AND request_id = $2
+            FOR UPDATE
+        `;
+        const offerRes = await query(offerQuery, [offerId, requestId]);
+
+        if (offerRes.rows.length === 0) {
+            await query('ROLLBACK');
+            return res.status(404).json({ error: 'Offer not found for this request' });
+        }
+
+        if (offerRes.rows[0].offer_status !== 'PENDING') {
+            await query('ROLLBACK');
+            return res.status(409).json({ error: 'Offer is not pending' });
+        }
+
+        const updateOffer = `
+            UPDATE service_offers
+            SET offer_status = 'REJECTED'
+            WHERE id = $1
+            RETURNING *
+        `;
+        const updateRes = await query(updateOffer, [offerId]);
+
+        const request = requestRes.rows[0];
+        if (request.is_public && request.status === 'OFFERED') {
+            const pendingQuery = `
+                SELECT COUNT(*)::int as count
+                FROM service_offers
+                WHERE request_id = $1 AND offer_status = 'PENDING'
+            `;
+            const pendingRes = await query(pendingQuery, [requestId]);
+            if (pendingRes.rows[0].count === 0) {
+                await query(
+                    `UPDATE service_requests SET status = 'OPEN', updated_at = NOW() WHERE id = $1`,
+                    [requestId]
+                );
+            }
+        }
+
+        await query('COMMIT');
+        res.json(updateRes.rows[0]);
+    } catch (err) {
+        await query('ROLLBACK');
+        console.error('Error rejecting offer:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
 
 exports.createTypeBRequest = async (req, res) => {
     try {
-        const { request_text, visibility } = req.body;
+        const { request_text, visibility, title, description, note } = req.body;
         const { user_id } = req.user;
         const locationId = req.locationId;
+        const resolvedDescription = description || request_text;
+        const resolvedRequestText = request_text || description;
 
-        if (!request_text || request_text.trim().length < 5) {
+        if (!resolvedDescription || resolvedDescription.trim().length < 5) {
             return res.status(400).json({ error: 'request_text must be at least 5 characters long' });
         }
         
@@ -201,13 +327,22 @@ exports.createTypeBRequest = async (req, res) => {
         const insertQuery = `
             INSERT INTO service_requests (
                 location_id, requester_id, category_id, request_text,
+                title, description, note,
                 is_public, status, expires_at
             )
-            VALUES ($1, $2, NULL, $3, $4, 'OPEN', NOW() + INTERVAL '24 hours')
+            VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, 'OPEN', NOW() + INTERVAL '24 hours')
             RETURNING *
         `;
 
-        const result = await query(insertQuery, [locationId, user_id, request_text, is_public]);
+        const result = await query(insertQuery, [
+            locationId,
+            user_id,
+            resolvedRequestText,
+            title || null,
+            resolvedDescription,
+            note || null,
+            is_public
+        ]);
         res.status(201).json(result.rows[0]);
 
     } catch (err) {
@@ -228,12 +363,13 @@ exports.getPublicRequests = async (req, res) => {
             if (!cursor) return res.status(400).json({ error: 'Invalid cursor format' });
 
             const sql = `
-                SELECT sr.id, sr.request_text, sr.created_at, sr.expires_at, u.name as requester_name
+                SELECT sr.id, sr.request_text, sr.title, sr.description, sr.note, sr.is_public, sr.status,
+                       sr.expires_at, sr.assigned_provider_user_id, sr.created_at, u.name as requester_name
                 FROM service_requests sr
                 JOIN users u ON sr.requester_id = u.id
                 WHERE sr.location_id = $1
                   AND sr.is_public = true
-                  AND sr.status = 'OPEN'
+                  AND sr.status IN ('OPEN', 'OFFERED')
                   AND sr.expires_at > NOW()
                   AND (sr.created_at, sr.id) < ($2::timestamptz, $3::uuid)
                 ORDER BY sr.created_at DESC, sr.id DESC
@@ -254,19 +390,20 @@ exports.getPublicRequests = async (req, res) => {
             FROM service_requests
             WHERE location_id = $1
               AND is_public = true
-              AND status = 'OPEN'
+              AND status IN ('OPEN', 'OFFERED')
               AND expires_at > NOW()
         `;
         const countRes = await query(countQuery, [locationId]);
         const total = countRes.rows[0].total;
 
         const publicRequestsQuery = `
-            SELECT sr.id, sr.request_text, sr.created_at, sr.expires_at, u.name as requester_name
+            SELECT sr.id, sr.request_text, sr.title, sr.description, sr.note, sr.is_public, sr.status,
+                   sr.expires_at, sr.assigned_provider_user_id, sr.created_at, u.name as requester_name
             FROM service_requests sr
             JOIN users u ON sr.requester_id = u.id
             WHERE sr.location_id = $1
               AND sr.is_public = true
-              AND sr.status = 'OPEN'
+              AND sr.status IN ('OPEN', 'OFFERED')
               AND sr.expires_at > NOW()
             ORDER BY sr.created_at DESC
             LIMIT $2 OFFSET $3
@@ -360,10 +497,10 @@ exports.acceptService = async (req, res) => {
 
         const updateQuery = `
             UPDATE service_requests 
-            SET status = 'ACCEPTED', updated_at = NOW() 
+            SET status = 'IN_PROGRESS', updated_at = NOW() 
             WHERE id = $1 
               AND location_id = $2 
-              AND status = 'ASSIGNED' 
+              AND status IN ('ASSIGNED', 'ACCEPTED') 
               AND assigned_user_id = $3
             RETURNING *
         `;
@@ -409,7 +546,7 @@ exports.cancelRequest = async (req, res) => {
             WHERE id = $1 
               AND location_id = $2 
               AND requester_id = $3 
-              AND status IN ('OPEN', 'ASSIGNED')
+              AND status IN ('OPEN', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'ACCEPTED')
             RETURNING *
         `;
         const updateRes = await query(updateQuery, [requestId, locationId, user_id]);
@@ -438,7 +575,7 @@ exports.completeService = async (req, res) => {
             SET status = 'COMPLETED', closed_at = NOW(), updated_at = NOW() 
             WHERE id = $1 
               AND location_id = $2 
-              AND status = 'ACCEPTED' 
+              AND status IN ('IN_PROGRESS', 'ACCEPTED') 
               AND assigned_user_id = $3
             RETURNING *
         `;
@@ -493,8 +630,8 @@ exports.getServiceContactCard = async (req, res) => {
         const request = requestRes.rows[0];
 
         // 2. Check status
-        if (!['ACCEPTED', 'COMPLETED'].includes(request.status)) {
-            return res.status(409).json({ error: 'Contact details are only available for ACCEPTED or COMPLETED requests' });
+        if (!['ACCEPTED', 'IN_PROGRESS', 'COMPLETED'].includes(request.status)) {
+            return res.status(409).json({ error: 'Contact details are only available for in-progress or completed requests' });
         }
 
         // 3. Check authorization and determine role
