@@ -8,6 +8,7 @@ const productRoutes = require('./routes/productRoutes')
 const orderRoutes = require('./routes/orderRoutes');
 const orderAdminRoutes = require('./routes/orderAdminRoutes');
 const publicProductRoutes = require('./routes/publicProductRoutes');
+const addressRoutes = require('./routes/addressRoutes');
 const serviceCategoryRoutes = require('./routes/serviceCategoryRoutes');
 const serviceRequestRoutes = require('./routes/serviceRequestRoutes');
 const serviceOfferRoutes = require('./routes/serviceOfferRoutes');
@@ -197,6 +198,7 @@ app.use('/api', shopVisibilityRoutes);
 app.use('/api', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/shop/orders', orderAdminRoutes);
+app.use('/api/addresses', addressRoutes);
 app.use('/api', publicProductRoutes);
 app.use('/api/admin/service-categories', serviceCategoryRoutes);
 app.use('/api/services', serviceRequestRoutes);
