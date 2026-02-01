@@ -14,7 +14,8 @@ exports.getOpenTypeARequests = async (req, res) => {
 
             const sql = `
                 SELECT 
-                    sr.id, sr.request_text, sr.status, sr.created_at, sr.expires_at,
+                    sr.id, sr.request_text, sr.title, sr.description, sr.note, sr.is_public,
+                    sr.status, sr.created_at, sr.expires_at, sr.assigned_provider_user_id,
                     u.name as requester_name, u.phone as requester_phone,
                     sc.name as category_name
                 FROM service_requests sr
@@ -35,7 +36,8 @@ exports.getOpenTypeARequests = async (req, res) => {
         // Legacy behavior (Array response)
         const sql = `
             SELECT 
-                sr.id, sr.request_text, sr.status, sr.created_at, sr.expires_at,
+                sr.id, sr.request_text, sr.title, sr.description, sr.note, sr.is_public,
+                sr.status, sr.created_at, sr.expires_at, sr.assigned_provider_user_id,
                 u.name as requester_name, u.phone as requester_phone,
                 sc.name as category_name
             FROM service_requests sr
@@ -86,7 +88,7 @@ exports.assignProvider = async (req, res) => {
 
         // 3. Fetch current state for audit (before update)
         const currentQuery = `
-            SELECT assigned_user_id, status 
+            SELECT assigned_user_id, assigned_provider_user_id, status 
             FROM service_requests 
             WHERE id = $1 AND location_id = $2
         `;
@@ -96,13 +98,17 @@ exports.assignProvider = async (req, res) => {
             return res.status(404).json({ error: 'Service request not found' });
         }
         
-        const oldProviderId = currentRes.rows[0].assigned_user_id;
+        const oldProviderId = currentRes.rows[0].assigned_provider_user_id || currentRes.rows[0].assigned_user_id;
 
         // 4. Atomic Update
         const updateQuery = `
             UPDATE service_requests
-            SET assigned_user_id = $1, status = 'ASSIGNED', updated_at = NOW(), assigned_at = NOW()
-            WHERE id = $2 AND location_id = $3 AND status IN ('OPEN', 'ASSIGNED')
+            SET assigned_provider_user_id = $1,
+                assigned_user_id = $1,
+                status = 'ASSIGNED',
+                updated_at = NOW(),
+                assigned_at = NOW()
+            WHERE id = $2 AND location_id = $3 AND status IN ('OPEN', 'OFFERED', 'ASSIGNED')
             RETURNING *
         `;
 
@@ -191,7 +197,8 @@ exports.getAllRequests = async (req, res) => {
 
         const dataQuery = `
             SELECT 
-                sr.id, sr.request_text, sr.status, sr.created_at, sr.expires_at, sr.is_public,
+                sr.id, sr.request_text, sr.title, sr.description, sr.note, sr.is_public,
+                sr.status, sr.created_at, sr.expires_at, sr.assigned_provider_user_id,
                 u.name as requester_name, u.phone as requester_phone,
                 sc.name as category_name,
                 p.name as provider_name
@@ -230,7 +237,7 @@ exports.adminCancelRequest = async (req, res) => {
         const updateQuery = `
             UPDATE service_requests 
             SET status = 'CANCELLED_BY_ADMIN', updated_at = NOW(), closed_at = NOW() 
-            WHERE id = $1 AND location_id = $2 AND status IN ('OPEN', 'ASSIGNED', 'ACCEPTED')
+            WHERE id = $1 AND location_id = $2 AND status IN ('OPEN', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'ACCEPTED')
             RETURNING *
         `;
         const updateRes = await query(updateQuery, [requestId, locationId]);
@@ -294,6 +301,11 @@ exports.getServiceDashboard = async (req, res) => {
                 sr.id,
                 CASE WHEN sr.category_id IS NOT NULL THEN 'TYPE_A' ELSE 'TYPE_B' END as type,
                 sr.status,
+                sr.title,
+                sr.description,
+                sr.note,
+                sr.is_public,
+                sr.assigned_provider_user_id,
                 sr.created_at,
                 sr.expires_at,
                 sc.name as category_name,

@@ -199,6 +199,7 @@ router.get('/requests/:requestId/offers', requireRole(ROLES.USER, ROLES.BUSINESS
  *         $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/requests/:requestId/offers/:offerId/accept', requireRole(ROLES.USER, ROLES.BUSINESS), serviceRequestController.acceptOffer);
+router.post('/requests/:requestId/offers/:offerId/reject', requireRole(ROLES.USER, ROLES.BUSINESS), serviceRequestController.rejectOffer);
 
 // Provider Accept Route
 router.post('/requests/:requestId/accept', requireRole(ROLES.USER, ROLES.BUSINESS), serviceRequestController.acceptService);

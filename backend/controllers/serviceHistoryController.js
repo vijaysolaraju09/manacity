@@ -15,10 +15,11 @@ exports.getMyServiceHistory = async (req, res) => {
 
             const sql = `
                 SELECT
-                    sr.id, sr.request_text, sr.status, sr.created_at, sr.expires_at, sr.is_public, sr.category_id,
+                    sr.id, sr.request_text, sr.title, sr.description, sr.note, sr.status,
+                    sr.created_at, sr.expires_at, sr.is_public, sr.category_id, sr.assigned_provider_user_id,
                     sc.name as category_name,
                     p.name as provider_name,
-                    CASE WHEN sr.status IN ('ASSIGNED', 'COMPLETED') THEN p.phone ELSE NULL END as provider_phone,
+                    CASE WHEN sr.status IN ('ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'ACCEPTED') THEN p.phone ELSE NULL END as provider_phone,
                     (SELECT COUNT(*)::int FROM service_offers so WHERE so.request_id = sr.id) as offers_count
                 FROM service_requests sr
                 LEFT JOIN service_categories sc ON sr.category_id = sc.id
@@ -35,11 +36,12 @@ exports.getMyServiceHistory = async (req, res) => {
         // Legacy behavior
         const sql = `
             SELECT
-                sr.id, sr.request_text, sr.status, sr.created_at, sr.expires_at, sr.is_public, sr.category_id,
+                sr.id, sr.request_text, sr.title, sr.description, sr.note, sr.status,
+                sr.created_at, sr.expires_at, sr.is_public, sr.category_id, sr.assigned_provider_user_id,
                 sc.name as category_name,
                 p.name as provider_name,
                 CASE
-                    WHEN sr.status IN ('ASSIGNED', 'COMPLETED') THEN p.phone
+                    WHEN sr.status IN ('ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'ACCEPTED') THEN p.phone
                     ELSE NULL
                 END as provider_phone,
                 (SELECT COUNT(*)::int FROM service_offers so WHERE so.request_id = sr.id) as offers_count
@@ -67,7 +69,8 @@ exports.getAdminServiceHistory = async (req, res) => {
 
         let sql = `
             SELECT
-                sr.id, sr.request_text, sr.status, sr.created_at, sr.expires_at, sr.is_public, sr.category_id,
+                sr.id, sr.request_text, sr.title, sr.description, sr.note, sr.status,
+                sr.created_at, sr.expires_at, sr.is_public, sr.category_id, sr.assigned_provider_user_id,
                 r.name as requester_name, r.phone as requester_phone,
                 p.name as provider_name, p.phone as provider_phone,
                 sc.name as category_name
