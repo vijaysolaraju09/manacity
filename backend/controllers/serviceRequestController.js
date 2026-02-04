@@ -12,9 +12,23 @@ exports.createTypeARequest = async (req, res) => {
 
         // 1. Validate inputs
         if (!category_id) {
+            console.error('[SERVICE_REQUEST_VALIDATION_ERROR]', {
+                endpoint: req.originalUrl,
+                body: req.body,
+                user_id: req.user?.user_id,
+                location_id: req.locationId,
+                reason: 'missing_category_id'
+            });
             return res.status(400).json({ error: 'category_id is required' });
         }
         if (!resolvedDescription || resolvedDescription.trim().length < 5) {
+            console.error('[SERVICE_REQUEST_VALIDATION_ERROR]', {
+                endpoint: req.originalUrl,
+                body: req.body,
+                user_id: req.user?.user_id,
+                location_id: req.locationId,
+                reason: 'request_text_too_short'
+            });
             return res.status(400).json({ error: 'request_text must be at least 5 characters long' });
         }
 
@@ -74,6 +88,8 @@ exports.createTypeARequest = async (req, res) => {
 
     } catch (err) {
         console.error('Error creating Type A service request:', err);
+        console.error('Error creating Type A service request message:', err.message);
+        console.error('Error creating Type A service request stack:', err.stack);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -299,6 +315,13 @@ exports.createTypeBRequest = async (req, res) => {
         const resolvedRequestText = request_text || description;
 
         if (!resolvedDescription || resolvedDescription.trim().length < 5) {
+            console.error('[SERVICE_REQUEST_VALIDATION_ERROR]', {
+                endpoint: req.originalUrl,
+                body: req.body,
+                user_id: req.user?.user_id,
+                location_id: req.locationId,
+                reason: 'request_text_too_short'
+            });
             return res.status(400).json({ error: 'request_text must be at least 5 characters long' });
         }
         
@@ -307,6 +330,13 @@ exports.createTypeBRequest = async (req, res) => {
         else if (visibility === 'PRIVATE') is_public = false;
         else if (typeof req.body.is_public === 'boolean') is_public = req.body.is_public; // Fallback
         else {
+            console.error('[SERVICE_REQUEST_VALIDATION_ERROR]', {
+                endpoint: req.originalUrl,
+                body: req.body,
+                user_id: req.user?.user_id,
+                location_id: req.locationId,
+                reason: 'invalid_visibility'
+            });
             return res.status(400).json({ error: 'visibility must be PUBLIC or PRIVATE' });
         }
 
@@ -347,6 +377,8 @@ exports.createTypeBRequest = async (req, res) => {
 
     } catch (err) {
         console.error('Error creating Type B service request:', err);
+        console.error('Error creating Type B service request message:', err.message);
+        console.error('Error creating Type B service request stack:', err.stack);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
