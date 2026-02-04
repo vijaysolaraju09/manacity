@@ -1,6 +1,7 @@
 const { query } = require('../config/db');
 const { sendNotification } = require('../services/notificationService');
 const { parseLimit, parseCursor, makeNextCursor } = require('../utils/pagination');
+const ROLES = require('../utils/roles');
 
 exports.createTypeARequest = async (req, res) => {
     try {
@@ -517,6 +518,87 @@ exports.getMyRequests = async (req, res) => {
         });
     } catch (err) {
         console.error('Error fetching my requests:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+exports.getServiceRequestById = async (req, res) => {
+    try {
+        const { requestId } = req.params;
+        const { user_id, role } = req.user;
+        const locationId = req.locationId;
+
+        const requestQuery = `
+            SELECT sr.id, sr.title, sr.description, sr.note, sr.status, sr.is_public, sr.created_at,
+                   sr.requester_id, u.name as requester_name
+            FROM service_requests sr
+            JOIN users u ON sr.requester_id = u.id
+            WHERE sr.id = $1
+              AND sr.location_id = $2
+              AND sr.deleted_at IS NULL
+        `;
+        const requestRes = await query(requestQuery, [requestId, locationId]);
+
+        if (requestRes.rows.length === 0) {
+            return res.status(404).json({ error: 'SERVICE_REQUEST_NOT_FOUND' });
+        }
+
+        const request = requestRes.rows[0];
+        const isRequester = request.requester_id === user_id;
+        const visibility = request.is_public ? 'PUBLIC' : 'PRIVATE';
+
+        const offersQuery = `
+            SELECT so.id, so.message, so.offer_status, so.created_at, so.provider_user_id,
+                   u.id as provider_id, u.name as provider_name
+            FROM service_offers so
+            JOIN users u ON so.provider_user_id = u.id
+            WHERE so.request_id = $1
+            ORDER BY so.created_at ASC
+        `;
+        const offersRes = await query(offersQuery, [requestId]);
+        const isProvider = offersRes.rows.some((offer) => offer.provider_user_id === user_id);
+        const canOffer = visibility === 'PUBLIC'
+            && request.status === 'OPEN'
+            && !isRequester
+            && (role === ROLES.USER || role === ROLES.BUSINESS)
+            && !isProvider;
+        const canRespond = isRequester && request.status === 'OPEN';
+
+        const offers = offersRes.rows.map((offer) => ({
+            id: offer.id,
+            message: offer.message,
+            status: offer.offer_status,
+            created_at: offer.created_at,
+            provider: {
+                id: offer.provider_id,
+                name: offer.provider_name
+            }
+        }));
+
+        res.json({
+            request: {
+                id: request.id,
+                title: request.title,
+                description: request.description,
+                note: request.note,
+                status: request.status,
+                visibility,
+                created_at: request.created_at,
+                requester: {
+                    id: request.requester_id,
+                    name: request.requester_name
+                }
+            },
+            offers,
+            viewer_context: {
+                isRequester,
+                isProvider,
+                canOffer,
+                canRespond
+            }
+        });
+    } catch (err) {
+        console.error('Error fetching service request:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 };

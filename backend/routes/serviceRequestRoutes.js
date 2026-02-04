@@ -165,6 +165,7 @@ router.get('/requests/public', requireRole(ROLES.USER, ROLES.BUSINESS), serviceR
  *         $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/requests/my', requireRole(ROLES.USER, ROLES.BUSINESS), serviceRequestController.getMyRequests);
+router.get('/requests/:requestId', requireRole(ROLES.USER, ROLES.BUSINESS, ROLES.LOCAL_ADMIN), serviceRequestController.getServiceRequestById);
 
 // Offer Management Routes
 router.post('/requests/:requestId/offers', requireRole(ROLES.USER, ROLES.BUSINESS), serviceOfferController.createOffer);
