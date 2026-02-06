@@ -535,7 +535,6 @@ exports.getServiceRequestById = async (req, res) => {
             JOIN users u ON sr.requester_id = u.id
             WHERE sr.id = $1
               AND sr.location_id = $2
-              AND sr.deleted_at IS NULL
         `;
         const requestRes = await query(requestQuery, [requestId, locationId]);
 
