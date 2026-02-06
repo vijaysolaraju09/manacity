@@ -45,5 +45,6 @@ const ROLES = require('../utils/roles');
  *         $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/requests/:requestId/offers', requireRole(ROLES.USER, ROLES.BUSINESS), serviceOfferController.createOffer);
+router.get('/offers/my', requireRole(ROLES.USER, ROLES.BUSINESS), serviceOfferController.getMyServiceOffers);
 
 module.exports = router;

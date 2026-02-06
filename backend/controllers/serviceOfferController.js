@@ -106,3 +106,59 @@ exports.createOffer = async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
+
+exports.getMyServiceOffers = async (req, res) => {
+    try {
+        const { user_id } = req.user;
+        const locationId = req.locationId;
+
+        const offersQuery = `
+            SELECT
+                so.id as offer_id,
+                so.offer_status,
+                so.created_at as offer_created_at,
+                sr.id as request_id,
+                sr.title,
+                sr.description,
+                sr.note,
+                sr.is_public,
+                sr.status,
+                u.id as requester_id,
+                u.name as requester_name
+            FROM service_offers so
+            JOIN service_requests sr ON so.request_id = sr.id
+            JOIN users u ON sr.requester_id = u.id
+            WHERE so.provider_user_id = $1
+              AND sr.location_id = $2
+              AND sr.deleted_at IS NULL
+            ORDER BY so.created_at DESC
+        `;
+
+        const result = await query(offersQuery, [user_id, locationId]);
+
+        const response = result.rows.map((row) => ({
+            offer: {
+                id: row.offer_id,
+                offer_status: row.offer_status,
+                created_at: row.offer_created_at
+            },
+            request: {
+                id: row.request_id,
+                title: row.title,
+                description: row.description,
+                note: row.note,
+                is_public: row.is_public,
+                status: row.status,
+                requester: {
+                    id: row.requester_id,
+                    name: row.requester_name
+                }
+            }
+        }));
+
+        res.json(response);
+    } catch (err) {
+        console.error('Error fetching my service offers:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
