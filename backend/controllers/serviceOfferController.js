@@ -130,7 +130,6 @@ exports.getMyServiceOffers = async (req, res) => {
             JOIN users u ON sr.requester_id = u.id
             WHERE so.provider_user_id = $1
               AND sr.location_id = $2
-              AND sr.deleted_at IS NULL
             ORDER BY so.created_at DESC
         `;
 
