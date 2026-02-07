@@ -168,7 +168,6 @@ router.get('/requests/my', requireRole(ROLES.USER, ROLES.BUSINESS), serviceReque
 router.get('/requests/:requestId', requireRole(ROLES.USER, ROLES.BUSINESS, ROLES.LOCAL_ADMIN), serviceRequestController.getServiceRequestById);
 
 // Offer Management Routes
-router.post('/requests/:requestId/offers', requireRole(ROLES.USER, ROLES.BUSINESS), serviceOfferController.createOffer);
 router.get('/requests/:requestId/offers', requireRole(ROLES.USER, ROLES.BUSINESS), serviceRequestController.getOffersForMyRequest);
 
 /**
