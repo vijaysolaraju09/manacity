@@ -3,13 +3,161 @@ const { generateOtp } = require('../utils/otp');
 const { hashPassword, comparePassword } = require('../utils/password');
 const { generateToken } = require('../utils/jwt');
 const { createError } = require('../utils/errors');
+const crypto = require('crypto');
+const https = require('https');
+
+const normalizePhone = (rawPhone) => {
+  if (rawPhone === undefined || rawPhone === null) return null;
+
+  const stringPhone = String(rawPhone).replace(/\s+/g, '');
+  if (!stringPhone) return null;
+
+  if (/^\+91\d{10}$/.test(stringPhone)) {
+    return stringPhone;
+  }
+
+  if (/^91\d{10}$/.test(stringPhone)) {
+    return `+${stringPhone}`;
+  }
+
+  if (/^\d{10}$/.test(stringPhone)) {
+    return `+91${stringPhone}`;
+  }
+
+  return null;
+};
+
+const maskPhoneForLogs = (phone) => {
+  const digits = String(phone || '').replace(/\D/g, '');
+  const tail = digits.slice(-2).padStart(2, '*');
+  return `***${tail}`;
+};
+
+const getOtpPepper = () => {
+  const pepper = process.env.OTP_PEPPER;
+  if (!pepper) {
+    throw new Error('OTP_PEPPER is not configured');
+  }
+  return pepper;
+};
+
+const hashOtp = (otp) => crypto
+  .createHash('sha256')
+  .update(`${otp}${getOtpPepper()}`)
+  .digest('hex');
+
+const requestPromise = ({ hostname, path, method, headers, body }) => new Promise((resolve, reject) => {
+  const req = https.request(
+    {
+      hostname,
+      path,
+      method,
+      headers
+    },
+    (response) => {
+      let responseData = '';
+      response.on('data', (chunk) => {
+        responseData += chunk;
+      });
+      response.on('end', () => {
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          resolve(responseData);
+          return;
+        }
+        const providerErr = new Error('SMS provider request failed');
+        providerErr.code = response.statusCode;
+        providerErr.responseBody = responseData;
+        reject(providerErr);
+      });
+    }
+  );
+
+  req.on('error', reject);
+
+  if (body) {
+    req.write(body);
+  }
+  req.end();
+});
+
+const sendSms = async (phoneE164, message) => {
+  const provider = (process.env.OTP_SMS_PROVIDER || '').toUpperCase();
+
+  if (provider === 'MSG91') {
+    const authKey = process.env.MSG91_AUTH_KEY;
+    const senderId = process.env.MSG91_SENDER_ID;
+    const templateId = process.env.MSG91_TEMPLATE_ID;
+
+    if (!authKey || !senderId) {
+      throw new Error('MSG91 configuration missing');
+    }
+
+    const payload = {
+      sender: senderId,
+      route: '4',
+      country: '91',
+      sms: [{
+        message,
+        to: [phoneE164.replace(/^\+/, '')]
+      }]
+    };
+
+    if (templateId) {
+      payload.template_id = templateId;
+    }
+
+    await requestPromise({
+      hostname: 'api.msg91.com',
+      path: '/api/v2/sendsms',
+      method: 'POST',
+      headers: {
+        authkey: authKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    return;
+  }
+
+  if (provider === 'TWILIO') {
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const fromNumber = process.env.TWILIO_FROM_NUMBER;
+
+    if (!accountSid || !authToken || !fromNumber) {
+      throw new Error('Twilio configuration missing');
+    }
+
+    const body = new URLSearchParams({
+      To: phoneE164,
+      From: fromNumber,
+      Body: message
+    }).toString();
+
+    await requestPromise({
+      hostname: 'api.twilio.com',
+      path: `/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(body)
+      },
+      body
+    });
+    return;
+  }
+
+  throw new Error('Unsupported OTP_SMS_PROVIDER');
+};
 
 const sendOtp = async (req, res) => {
   try {
     const { phone } = req.body;
+    const normalizedPhone = normalizePhone(phone);
 
     // 1. Validation: Phone must be present and 10 digits
-    if (!phone || !/^\d{10}$/.test(phone)) {
+    if (!normalizedPhone) {
       return res.status(400).json({ error: 'Invalid phone number. Must be 10 digits.' });
     }
 
@@ -19,7 +167,7 @@ const sendOtp = async (req, res) => {
       FROM otp_codes 
       WHERE phone = $1 AND created_at > NOW() - INTERVAL '1 hour'
     `;
-    const rateLimitRes = await query(rateLimitQuery, [phone]);
+    const rateLimitRes = await query(rateLimitQuery, [normalizedPhone]);
     const otpCount = parseInt(rateLimitRes.rows[0].count, 10);
 
     if (otpCount >= 3) {
@@ -28,20 +176,29 @@ const sendOtp = async (req, res) => {
 
     // 3. Generate OTP
     const otp = generateOtp();
-    
-    // Log OTP to console (Dev behavior)
-    console.log(`[DEV] OTP for ${phone}: ${otp}`);
+    const otpHash = hashOtp(otp);
+    const message = `Your Manacity OTP is ${otp}. Valid for 5 minutes.`;
+
+    try {
+      await sendSms(normalizedPhone, message);
+    } catch (smsErr) {
+      console.error(`Send OTP SMS Error for phone ${maskPhoneForLogs(normalizedPhone)}:`, {
+        code: smsErr.code,
+        message: smsErr.message
+      });
+      return res.status(500).json({ error: 'Unable to send OTP' });
+    }
 
     // 4. Insert into DB
     const insertQuery = `
       INSERT INTO otp_codes (phone, otp, expires_at) 
       VALUES ($1, $2, NOW() + INTERVAL '5 minutes')
     `;
-    await query(insertQuery, [phone, otp]);
+    await query(insertQuery, [normalizedPhone, otpHash]);
 
     res.status(200).json({ message: 'OTP sent successfully' });
   } catch (err) {
-    console.error('Send OTP Error:', err);
+    console.error(`Send OTP Error for phone ${maskPhoneForLogs(req.body?.phone)}:`, err.message);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
@@ -49,9 +206,10 @@ const sendOtp = async (req, res) => {
 const verifyOtp = async (req, res) => {
   try {
     const { phone, otp } = req.body;
+    const normalizedPhone = normalizePhone(phone);
 
     // 1. Validation
-    if (!phone || !/^\d{10}$/.test(phone)) {
+    if (!normalizedPhone) {
       return res.status(400).json({ error: 'Invalid phone number. Must be 10 digits.' });
     }
     if (!otp || !/^\d{6}$/.test(otp)) {
@@ -66,7 +224,7 @@ const verifyOtp = async (req, res) => {
       ORDER BY created_at DESC 
       LIMIT 1
     `;
-    const { rows } = await query(findQuery, [phone]);
+    const { rows } = await query(findQuery, [normalizedPhone]);
 
     if (rows.length === 0) {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
@@ -80,10 +238,11 @@ const verifyOtp = async (req, res) => {
     }
 
     // 4. Compare OTP
-    if (record.otp !== otp) {
+    const otpHash = hashOtp(otp);
+    if (record.otp !== otpHash) {
       // Increment attempts
       await query('UPDATE otp_codes SET attempts = attempts + 1 WHERE id = $1', [record.id]);
-      return res.status(400).json({ error: 'Invalid OTP' });
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
     // 5. Success: Mark as verified (attempts=999) and expire it so it can't be verified again
@@ -95,7 +254,7 @@ const verifyOtp = async (req, res) => {
 
     res.status(200).json({ message: 'OTP verified', verified: true });
   } catch (err) {
-    console.error('Verify OTP Error:', err);
+    console.error(`Verify OTP Error for phone ${maskPhoneForLogs(req.body?.phone)}:`, err.message);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
@@ -103,9 +262,10 @@ const verifyOtp = async (req, res) => {
 const register = async (req, res) => {
   try {
     const { phone, password, location_id, name } = req.body;
+    const normalizedPhone = normalizePhone(phone);
 
     // 1. Input Validation
-    if (!phone || !/^\d{10}$/.test(phone)) {
+    if (!normalizedPhone) {
       return res.status(400).json({ error: 'Invalid phone number' });
     }
     if (!password || password.length < 6) {
@@ -122,13 +282,13 @@ const register = async (req, res) => {
       WHERE phone = $1 AND attempts = 999 AND created_at > NOW() - INTERVAL '2 minutes'
       ORDER BY created_at DESC LIMIT 1
     `;
-    const otpRes = await query(otpCheckQuery, [phone]);
+    const otpRes = await query(otpCheckQuery, [normalizedPhone]);
     if (otpRes.rows.length === 0) {
       return res.status(400).json({ error: 'Phone not verified or verification expired. Please verify OTP again.' });
     }
 
     // 3. Check if User Already Exists
-    const userCheckRes = await query('SELECT id FROM users WHERE phone = $1', [phone]);
+    const userCheckRes = await query('SELECT id FROM users WHERE phone = $1', [normalizedPhone]);
     if (userCheckRes.rows.length > 0) {
       return res.status(409).json({ error: 'User already exists' });
     }
@@ -146,7 +306,7 @@ const register = async (req, res) => {
       VALUES ($1, $2, $3, $4, 'USER', 'APPROVED')
       RETURNING id, phone, role, location_id, name
     `;
-    const newUserRes = await query(insertUserQuery, [phone, hashedPassword, location_id, name]);
+    const newUserRes = await query(insertUserQuery, [normalizedPhone, hashedPassword, location_id, name]);
 
     res.status(201).json({
       message: 'Registered successfully',
@@ -161,28 +321,6 @@ const register = async (req, res) => {
 const login = async (req, res, next) => {
   try {
     const { phone, password } = req.body;
-
-    // Normalize phone to E.164 with India-specific defaults
-    const normalizePhone = (rawPhone) => {
-      if (rawPhone === undefined || rawPhone === null) return null;
-
-      const stringPhone = String(rawPhone).replace(/\s+/g, '');
-      if (!stringPhone) return null;
-
-      if (stringPhone.startsWith('+')) {
-        return stringPhone;
-      }
-
-      if (/^\d{10}$/.test(stringPhone)) {
-        return `+91${stringPhone}`;
-      }
-
-      if (/^91\d{10}$/.test(stringPhone)) {
-        return `+${stringPhone}`;
-      }
-
-      return null;
-    };
 
     const normalizedPhone = normalizePhone(phone);
 
