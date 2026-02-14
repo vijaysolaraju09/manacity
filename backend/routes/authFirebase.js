@@ -15,7 +15,7 @@ const { createError } = require('../utils/errors');
 
 /**
  * @swagger
- * /api/auth/register:
+ * /api/auth/firebase/register:
  *   post:
  *     summary: Register a new user (Firebase Protected)
  *     description: >
@@ -60,6 +60,8 @@ router.post('/register', verifyFirebaseToken, async (req, res, next) => {
 
   const trimmedName = typeof name === 'string' ? name.trim() : '';
   const sanitizedLocationId = typeof location_id === 'string' ? location_id.trim() : location_id;
+
+  console.log('[AUTH_FIREBASE_REGISTER]', { phone: phone_number, location_id: sanitizedLocationId });
 
   if (!phone_number) {
     return next(createError(400, 'FIREBASE_PHONE_MISSING', 'Firebase token missing phone number'));
@@ -131,7 +133,7 @@ router.post('/register', verifyFirebaseToken, async (req, res, next) => {
 
 /**
  * @swagger
- * /api/auth/reset-password:
+ * /api/auth/firebase/reset-password:
  *   post:
  *     summary: Reset password (Firebase Protected)
  *     description: >
