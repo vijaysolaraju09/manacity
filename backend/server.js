@@ -137,8 +137,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Mount Firebase auth routes before existing auth routes to override registration logic
-app.use('/api/auth', authFirebase);
+// Mount Firebase auth routes under a dedicated namespace to avoid route conflicts
+app.use('/api/auth/firebase', authFirebase);
 app.use('/api/auth', authRoutes);
 
 // Endpoints
