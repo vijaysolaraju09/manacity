@@ -330,10 +330,24 @@ const register = async (req, res) => {
       RETURNING id, phone, role, location_id, name
     `;
     const newUserRes = await query(insertUserQuery, [normalizedPhone, hashedPassword, location_id, name]);
+    const newUser = newUserRes.rows[0];
+
+    const token = generateToken({
+      user_id: newUser.id,
+      phone: newUser.phone,
+      role: newUser.role,
+      location_id: newUser.location_id
+    });
 
     res.status(201).json({
-      message: 'Registered successfully',
-      user: newUserRes.rows[0],
+      token,
+      user: {
+        id: newUser.id,
+        phone: newUser.phone,
+        role: newUser.role,
+        location_id: newUser.location_id,
+        name: newUser.name
+      }
     });
   } catch (err) {
     console.error('Registration Error:', err);
