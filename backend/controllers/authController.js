@@ -179,22 +179,45 @@ const sendOtp = async (req, res) => {
     const otpHash = hashOtp(otp);
     const message = `Your Manacity OTP is ${otp}. Valid for 5 minutes.`;
 
+    // 4. Insert into DB before sending SMS
+    const insertQuery = `
+      INSERT INTO otp_codes (phone, otp, expires_at)
+      VALUES ($1, $2, NOW() + INTERVAL '5 minutes')
+      RETURNING id
+    `;
+
+    let otpRowId;
+    try {
+      const insertRes = await query(insertQuery, [normalizedPhone, otpHash]);
+      otpRowId = insertRes.rows[0]?.id;
+    } catch (dbErr) {
+      console.error(`Send OTP DB Insert Error for phone ${maskPhoneForLogs(normalizedPhone)}:`, {
+        code: dbErr.code,
+        message: dbErr.message
+      });
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
     try {
       await sendSms(normalizedPhone, message);
     } catch (smsErr) {
+      if (otpRowId) {
+        try {
+          await query('DELETE FROM otp_codes WHERE id = $1', [otpRowId]);
+        } catch (cleanupErr) {
+          console.error(`Send OTP Cleanup Error for phone ${maskPhoneForLogs(normalizedPhone)}:`, {
+            code: cleanupErr.code,
+            message: cleanupErr.message
+          });
+        }
+      }
+
       console.error(`Send OTP SMS Error for phone ${maskPhoneForLogs(normalizedPhone)}:`, {
         code: smsErr.code,
         message: smsErr.message
       });
       return res.status(500).json({ error: 'Unable to send OTP' });
     }
-
-    // 4. Insert into DB
-    const insertQuery = `
-      INSERT INTO otp_codes (phone, otp, expires_at) 
-      VALUES ($1, $2, NOW() + INTERVAL '5 minutes')
-    `;
-    await query(insertQuery, [normalizedPhone, otpHash]);
 
     res.status(200).json({ message: 'OTP sent successfully' });
   } catch (err) {
