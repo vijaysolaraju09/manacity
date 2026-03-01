@@ -286,33 +286,46 @@ const register = async (req, res) => {
   try {
     const { phone, password, location_id, name } = req.body;
     const normalizedPhone = normalizePhone(phone);
+    const phoneMasked = maskPhoneForLogs(normalizedPhone || phone);
+
+    const logValidationError = (reason) => {
+      console.warn('[OTP_REGISTER_VALIDATION_ERROR]', {
+        phone_masked: phoneMasked,
+        reason
+      });
+    };
 
     // 1. Input Validation
     if (!normalizedPhone) {
+      logValidationError('INVALID_PHONE');
       return res.status(400).json({ error: 'Invalid phone number' });
     }
     if (!password || password.length < 6) {
+      logValidationError('INVALID_PASSWORD');
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
     if (!location_id) {
+      logValidationError('LOCATION_ID_REQUIRED');
       return res.status(400).json({ error: 'Location ID is required' });
     }
 
     // 2. Check OTP Verification Status
-    // Must have a record with attempts=999 created within the last 2 minutes
+    // Must have a record with attempts=999 created within the last 10 minutes
     const otpCheckQuery = `
       SELECT id FROM otp_codes 
-      WHERE phone = $1 AND attempts = 999 AND created_at > NOW() - INTERVAL '2 minutes'
+      WHERE phone = $1 AND attempts = 999 AND created_at > NOW() - INTERVAL '10 minutes'
       ORDER BY created_at DESC LIMIT 1
     `;
     const otpRes = await query(otpCheckQuery, [normalizedPhone]);
     if (otpRes.rows.length === 0) {
+      logValidationError('PHONE_NOT_VERIFIED');
       return res.status(400).json({ error: 'Phone not verified or verification expired. Please verify OTP again.' });
     }
 
     // 3. Check if User Already Exists
     const userCheckRes = await query('SELECT id FROM users WHERE phone = $1', [normalizedPhone]);
     if (userCheckRes.rows.length > 0) {
+      logValidationError('USER_ALREADY_EXISTS');
       return res.status(409).json({ error: 'User already exists' });
     }
 
@@ -334,7 +347,7 @@ const register = async (req, res) => {
 
     const token = generateToken({
       user_id: newUser.id,
-      phone: newUser.phone,
+      phone: normalizedPhone,
       role: newUser.role,
       location_id: newUser.location_id
     });
