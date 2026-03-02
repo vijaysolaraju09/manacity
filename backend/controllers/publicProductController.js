@@ -7,7 +7,7 @@ const getPublicProducts = async (req, res, next) => {
     const { shopId, search } = req.query;
 
     let sql = `
-      SELECT p.id, p.name, p.description, p.price, p.shop_id
+      SELECT p.id, p.name, p.description, p.price, p.shop_id, p.stock_quantity
       FROM products p
       JOIN shops s ON p.shop_id = s.id
       WHERE p.location_id = $1

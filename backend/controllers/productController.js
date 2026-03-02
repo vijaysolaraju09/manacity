@@ -1,11 +1,35 @@
 const { query } = require('../config/db');
 
+const parseStockQuantity = (body) => {
+  const stockInput = body.stock_quantity ?? body.stockQuantity ?? body.quantity;
+
+  if (stockInput === undefined) {
+    return { provided: false, value: 0 };
+  }
+
+  const stockQty = Number.parseInt(stockInput, 10);
+
+  if (Number.isNaN(stockQty) || stockQty < 0) {
+    return { error: { code: 'PRODUCT_STOCK_INVALID', message: 'Stock quantity must be an integer greater than or equal to 0' } };
+  }
+
+  return { provided: true, value: stockQty };
+};
+
 const addProduct = async (req, res) => {
   try {
     const { shopId } = req.params;
     const { name, description, price } = req.body;
     const { user_id } = req.user;
     const locationId = req.locationId;
+    const stockResult = parseStockQuantity(req.body);
+
+    if (stockResult.error) {
+      return res.status(400).json(stockResult.error);
+    }
+
+    const stockQty = stockResult.value;
+    console.log('[PRODUCT_STOCK_IN]', { productId: null, stockQty });
 
     // 1. Input Validation
     if (!name || name.trim().length < 2) {
@@ -45,11 +69,11 @@ const addProduct = async (req, res) => {
 
     // 3. Insert Product
     const insertQuery = `
-      INSERT INTO products (shop_id, location_id, name, description, price, is_available)
-      VALUES ($1, $2, $3, $4, $5, true)
+      INSERT INTO products (shop_id, location_id, name, description, price, is_available, stock_quantity)
+      VALUES ($1, $2, $3, $4, $5, true, $6)
       RETURNING *
     `;
-    const insertRes = await query(insertQuery, [shopId, locationId, name, description, price]);
+    const insertRes = await query(insertQuery, [shopId, locationId, name, description, price, stockQty]);
 
     res.status(201).json(insertRes.rows[0]);
   } catch (err) {
@@ -64,6 +88,14 @@ const updateProduct = async (req, res) => {
     const { name, description, price, is_available } = req.body;
     const { user_id } = req.user;
     const locationId = req.locationId;
+    const stockResult = parseStockQuantity(req.body);
+
+    if (stockResult.error) {
+      return res.status(400).json(stockResult.error);
+    }
+
+    const stockQty = stockResult.provided ? stockResult.value : undefined;
+    console.log('[PRODUCT_STOCK_IN]', { productId, stockQty });
 
     // 1. Validate Input (if provided)
     if (name !== undefined && name.trim().length < 2) {
@@ -99,6 +131,7 @@ const updateProduct = async (req, res) => {
     if (description !== undefined) { fields.push(`description = $${idx++}`); values.push(description); }
     if (price !== undefined) { fields.push(`price = $${idx++}`); values.push(price); }
     if (is_available !== undefined) { fields.push(`is_available = $${idx++}`); values.push(is_available); }
+    if (stockQty !== undefined) { fields.push(`stock_quantity = $${idx++}`); values.push(stockQty); }
 
     if (fields.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
