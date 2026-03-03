@@ -71,11 +71,17 @@ const updateOrderStatus = async (req, res, next, newStatus) => {
     if (newStatus === 'REJECTED') {
       updateSql = `
         UPDATE orders
-        SET status = 'REJECTED', updated_at = NOW(), admin_note = $2
+        SET
+          status = 'REJECTED',
+          updated_at = NOW(),
+          admin_note = $2,
+          rejection_reason = $2,
+          rejected_at = NOW(),
+          rejected_by = $3
         WHERE id = $1
         RETURNING *
       `;
-      params = [orderId, reason || null];
+      params = [orderId, reason || null, user_id];
     } else {
       updateSql = `
         UPDATE orders
