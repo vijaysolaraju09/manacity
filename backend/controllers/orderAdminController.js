@@ -58,11 +58,11 @@ const updateOrderStatus = async (req, res, next, newStatus) => {
 
     if (order.owner_id !== user_id) {
       logOrderEvent(req, 'warn', 'business_order_status_forbidden', orderId, user_id);
-      return next(createError(403, 'ORDER_FORBIDDEN', 'You do not own the shop for this order'));
+      return next(createError(403, 'ORDER_NOT_OWNED', 'You do not own the shop for this order'));
     }
 
-    if (order.status !== 'PENDING') {
-      return next(createError(400, 'ORDER_STATUS_INVALID', `Only PENDING orders can be ${newStatus.toLowerCase()}`));
+    if (!['PENDING', 'PLACED'].includes(order.status)) {
+      return next(createError(400, 'ORDER_INVALID_STATUS', `Only PENDING/PLACED orders can be ${newStatus.toLowerCase()}`));
     }
 
     let updateSql;
@@ -153,11 +153,11 @@ const deliverOrder = async (req, res, next) => {
     const order = checkRes.rows[0];
 
     if (order.owner_id !== user_id) {
-      return next(createError(403, 'ORDER_FORBIDDEN', 'You do not own the shop for this order'));
+      return next(createError(403, 'ORDER_NOT_OWNED', 'You do not own the shop for this order'));
     }
 
     if (order.status !== 'ACCEPTED') {
-      return next(createError(400, 'ORDER_STATUS_INVALID', `Order must be ACCEPTED to be delivered. Current status: ${order.status}`));
+      return next(createError(400, 'ORDER_INVALID_STATUS', `Order must be ACCEPTED to be delivered. Current status: ${order.status}`));
     }
 
     const updateSql = `

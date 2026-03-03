@@ -141,6 +141,96 @@ const createOrder = async (req, res, next) => {
   }
 };
 
+
+const getOrderDetailsForUser = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const { user_id } = req.user;
+    const locationId = req.locationId;
+
+    const existsSql = `
+      SELECT id, user_id
+      FROM orders
+      WHERE id = $1
+        AND location_id = $2
+        AND deleted_at IS NULL
+    `;
+
+    const existsRes = await pool.query(existsSql, [orderId, locationId]);
+
+    if (existsRes.rows.length === 0) {
+      return next(createError(404, 'ORDER_NOT_FOUND', 'Order not found'));
+    }
+
+    if (existsRes.rows[0].user_id !== user_id) {
+      return next(createError(403, 'ORDER_NOT_OWNED', 'You do not own this order'));
+    }
+
+    const orderSql = `
+      SELECT
+        o.id,
+        o.status,
+        o.subtotal,
+        o.delivery_fee,
+        o.total,
+        o.created_at,
+        o.updated_at,
+        o.delivery_address,
+        a.label AS address_label,
+        a.address_line
+      FROM orders o
+      LEFT JOIN addresses a ON a.id = o.address_id
+      WHERE o.id = $1
+        AND o.user_id = $2
+        AND o.location_id = $3
+        AND o.deleted_at IS NULL
+    `;
+
+    const orderResult = await pool.query(orderSql, [orderId, user_id, locationId]);
+    const order = orderResult.rows[0];
+
+    const orderItemsSql = `
+      SELECT
+        oi.product_id,
+        oi.name_snapshot AS product_name,
+        oi.price_snapshot AS price,
+        oi.quantity,
+        oi.line_total
+      FROM order_items oi
+      WHERE oi.order_id = $1
+      ORDER BY oi.created_at ASC
+    `;
+
+    const itemsResult = await pool.query(orderItemsSql, [orderId]);
+
+    res.json({
+      order: {
+        id: order.id,
+        status: order.status,
+        subtotal: order.subtotal,
+        delivery_fee: order.delivery_fee,
+        total: order.total,
+        created_at: order.created_at,
+        updated_at: order.updated_at,
+      },
+      address: {
+        label: order.address_label || 'Delivery Address',
+        address_line: order.address_line || order.delivery_address,
+      },
+      items: itemsResult.rows.map((item) => ({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        price: item.price,
+        quantity: item.quantity,
+        line_total: item.line_total,
+      })),
+    });
+  } catch (err) {
+    console.error('Get Order Details For User Error:', err);
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
+  }
+};
+
 const getMyOrders = async (req, res, next) => {
   try {
     const { user_id } = req.user;
@@ -178,4 +268,4 @@ const getMyOrders = async (req, res, next) => {
   }
 };
 
-module.exports = { createOrder, getMyOrders };
+module.exports = { createOrder, getMyOrders, getOrderDetailsForUser };
