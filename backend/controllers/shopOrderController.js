@@ -26,6 +26,24 @@ const logOrderEvent = (req, level, event, orderId, userId, extra = {}) => {
   console.info(line);
 };
 
+const maskPhoneLastTwo = (phone) => {
+  if (!phone) {
+    return null;
+  }
+
+  const value = String(phone);
+  if (value.length <= 2) {
+    return value;
+  }
+
+  return `${'*'.repeat(value.length - 2)}${value.slice(-2)}`;
+};
+
+const toNumeric = (value, fallback = 0) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 const validateBusinessUser = (req, next) => {
   if (!req.user || req.user.role !== ROLES.BUSINESS) {
     next(createError(403, 'AUTH_FORBIDDEN', 'Only business users can manage received orders'));
@@ -136,15 +154,60 @@ const getOrderDetailsForBusiness = async (req, res, next) => {
         a.address_line,
         u.id AS customer_id,
         u.name AS customer_name,
-        u.phone AS customer_phone
+        u.phone AS customer_phone,
+        COALESCE(SUM(oi.line_total), 0)::numeric AS subtotal,
+        0::numeric AS delivery_fee,
+        (COALESCE(SUM(oi.line_total), 0) + 0)::numeric AS total,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'product_id', oi.product_id,
+              'product_name', COALESCE(p.name, oi.name_snapshot, 'Product'),
+              'quantity', COALESCE(oi.quantity, 0),
+              'unit_price', COALESCE(
+                oi.price_snapshot,
+                p.price,
+                CASE
+                  WHEN COALESCE(oi.quantity, 0) > 0 THEN oi.line_total / oi.quantity
+                  ELSE 0
+                END,
+                0
+              ),
+              'line_total', COALESCE(
+                oi.line_total,
+                COALESCE(oi.quantity, 0) * COALESCE(oi.price_snapshot, p.price, 0),
+                0
+              )
+            )
+            ORDER BY oi.created_at ASC
+          ) FILTER (WHERE oi.id IS NOT NULL),
+          '[]'::json
+        ) AS items
       FROM orders o
       JOIN shops s ON s.id = o.shop_id
       JOIN users u ON u.id = o.user_id
       LEFT JOIN addresses a ON a.id = o.address_id
+      LEFT JOIN order_items oi ON oi.order_id = o.id
+      LEFT JOIN products p ON p.id = oi.product_id
       WHERE o.id = $1
         AND s.owner_id = $2
         AND o.location_id = $3
         AND o.deleted_at IS NULL
+      GROUP BY
+        o.id,
+        o.status,
+        o.created_at,
+        o.rejection_reason,
+        o.shop_id,
+        s.name,
+        s.phone,
+        o.delivery_address,
+        a.id,
+        a.label,
+        a.address_line,
+        u.id,
+        u.name,
+        u.phone
     `;
 
     const orderResult = await query(orderSql, [orderId, userId, locationId]);
@@ -156,40 +219,38 @@ const getOrderDetailsForBusiness = async (req, res, next) => {
 
     const order = orderResult.rows[0];
 
-    const orderItemsSql = `
-      SELECT
-        oi.product_id,
-        COALESCE(p.name, oi.name_snapshot) AS product_name,
-        oi.price_snapshot AS unit_price,
-        oi.quantity,
-        (oi.quantity * oi.price_snapshot) AS line_total
-      FROM order_items oi
-      LEFT JOIN products p ON p.id = oi.product_id
-      WHERE oi.order_id = $1
-      ORDER BY oi.created_at ASC
-    `;
+    logOrderEvent(req, 'info', 'business_order_details_fetched', orderId, userId, {
+      shop_phone_masked: maskPhoneLastTwo(order.shop_phone),
+      customer_phone_masked: maskPhoneLastTwo(order.customer_phone),
+      item_count: Array.isArray(order.items) ? order.items.length : 0,
+    });
 
-    const orderItemsResult = await query(orderItemsSql, [orderId]);
+    const items = (order.items || []).map((item) => {
+      const quantity = Number.parseInt(item.quantity, 10);
+      const parsedQuantity = Number.isFinite(quantity) ? quantity : 0;
+      const unitPrice = toNumeric(item.unit_price, 0);
+      const lineTotal = toNumeric(item.line_total, unitPrice * parsedQuantity);
 
-    logOrderEvent(req, 'info', 'business_order_details_fetched', orderId, userId);
+      return {
+        product_id: item.product_id,
+        product_name: item.product_name || 'Product',
+        quantity: parsedQuantity,
+        unit_price: unitPrice,
+        line_total: lineTotal,
+      };
+    });
 
-    const items = orderItemsResult.rows.map((item) => ({
-      product_id: item.product_id,
-      product_name: item.product_name,
-      unit_price: Number(item.unit_price),
-      quantity: Number(item.quantity),
-      line_total: Number(item.line_total),
-    }));
-
-    const subtotal = items.reduce((sum, item) => sum + item.line_total, 0);
+    const subtotal = toNumeric(order.subtotal, items.reduce((sum, item) => sum + item.line_total, 0));
+    const deliveryFee = toNumeric(order.delivery_fee, 0);
+    const total = toNumeric(order.total, subtotal + deliveryFee);
 
     res.json({
       id: order.id,
       status: order.status,
       created_at: order.created_at,
       subtotal,
-      delivery_fee: 0,
-      total: subtotal,
+      delivery_fee: deliveryFee,
+      total,
       rejection_reason: order.rejection_reason,
       shop: {
         id: order.shop_id,
