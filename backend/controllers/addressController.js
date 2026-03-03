@@ -9,8 +9,16 @@ const validateAddressLine = (addressLine) => typeof addressLine === 'string' && 
 
 exports.getMyAddresses = async (req, res, next) => {
     try {
-        const userId = req.user.user_id;
+        const userId = req.user?.user_id;
         const locationId = req.locationId;
+
+        if (!userId) {
+            console.error('[ADDRESSES_MY_AUTH_MISSING]', {
+                hasUser: !!req.user,
+                keys: Object.keys(req.user || {})
+            });
+            return next(createError(401, 'AUTH_INVALID', 'User not found in token'));
+        }
 
         const sql = `
             SELECT id, user_id, location_id, label, address_line, is_default, created_at, updated_at
@@ -18,11 +26,11 @@ exports.getMyAddresses = async (req, res, next) => {
             WHERE user_id = $1
               AND location_id = $2
               AND deleted_at IS NULL
-            ORDER BY is_default DESC, created_at DESC
+            ORDER BY is_default DESC, updated_at DESC
         `;
 
         const result = await query(sql, [userId, locationId]);
-        res.json({ data: result.rows });
+        res.json(result.rows);
     } catch (err) {
         console.error('Error fetching addresses:', err);
         next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
