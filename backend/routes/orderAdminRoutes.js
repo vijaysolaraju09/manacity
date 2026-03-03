@@ -26,7 +26,7 @@ const ROLES = require('../utils/roles');
  *       500:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/pending', requireRole(ROLES.USER, ROLES.BUSINESS), getPendingOrders);
+router.get('/pending', requireRole(ROLES.BUSINESS), getPendingOrders);
 
 // GET /api/shop/orders/received
 router.get('/received', requireRole(ROLES.BUSINESS), getReceivedOrders);
@@ -60,7 +60,7 @@ router.get('/:orderId', requireRole(ROLES.BUSINESS), getOrderDetailsForBusiness)
  *       500:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/:orderId/accept', requireRole(ROLES.USER, ROLES.BUSINESS), acceptOrder);
+router.post('/:orderId/accept', requireRole(ROLES.BUSINESS), acceptOrder);
 
 // POST /api/shop/orders/:orderId/reject
 /**
@@ -88,7 +88,7 @@ router.post('/:orderId/accept', requireRole(ROLES.USER, ROLES.BUSINESS), acceptO
  *       500:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/:orderId/reject', requireRole(ROLES.USER, ROLES.BUSINESS), rejectOrder);
+router.post('/:orderId/reject', requireRole(ROLES.BUSINESS), rejectOrder);
 
 // POST /api/shop/orders/:orderId/deliver
 /**
@@ -114,6 +114,6 @@ router.post('/:orderId/reject', requireRole(ROLES.USER, ROLES.BUSINESS), rejectO
  *       500:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/:orderId/deliver', requireRole(ROLES.USER, ROLES.BUSINESS), deliverOrder);
+router.post('/:orderId/deliver', requireRole(ROLES.BUSINESS), deliverOrder);
 
 module.exports = router;
