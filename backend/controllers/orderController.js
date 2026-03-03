@@ -148,37 +148,25 @@ const getOrderDetailsForUser = async (req, res, next) => {
     const { user_id } = req.user;
     const locationId = req.locationId;
 
-    const existsSql = `
-      SELECT id, user_id
-      FROM orders
-      WHERE id = $1
-        AND location_id = $2
-        AND deleted_at IS NULL
-    `;
-
-    const existsRes = await pool.query(existsSql, [orderId, locationId]);
-
-    if (existsRes.rows.length === 0) {
-      return next(createError(404, 'ORDER_NOT_FOUND', 'Order not found'));
-    }
-
-    if (existsRes.rows[0].user_id !== user_id) {
-      return next(createError(403, 'ORDER_NOT_OWNED', 'You do not own this order'));
-    }
-
     const orderSql = `
       SELECT
         o.id,
         o.status,
-        o.subtotal,
-        o.delivery_fee,
-        o.total,
         o.created_at,
-        o.updated_at,
+        o.rejection_reason,
+        o.shop_id,
+        s.name AS shop_name,
+        s.phone AS shop_phone,
+        u.id AS customer_id,
+        u.name AS customer_name,
+        u.phone AS customer_phone,
+        a.id AS address_id,
         o.delivery_address,
         a.label AS address_label,
         a.address_line
       FROM orders o
+      JOIN shops s ON s.id = o.shop_id
+      JOIN users u ON u.id = o.user_id
       LEFT JOIN addresses a ON a.id = o.address_id
       WHERE o.id = $1
         AND o.user_id = $2
@@ -187,43 +175,61 @@ const getOrderDetailsForUser = async (req, res, next) => {
     `;
 
     const orderResult = await pool.query(orderSql, [orderId, user_id, locationId]);
+    if (orderResult.rowCount === 0) {
+      return next(createError(404, 'ORDER_NOT_FOUND_FOR_CUSTOMER', 'Order not found for this customer'));
+    }
+
     const order = orderResult.rows[0];
 
     const orderItemsSql = `
       SELECT
         oi.product_id,
-        oi.name_snapshot AS product_name,
-        oi.price_snapshot AS price,
+        COALESCE(p.name, oi.name_snapshot) AS product_name,
+        oi.price_snapshot AS unit_price,
         oi.quantity,
-        oi.line_total
+        (oi.quantity * oi.price_snapshot) AS line_total
       FROM order_items oi
+      LEFT JOIN products p ON p.id = oi.product_id
       WHERE oi.order_id = $1
       ORDER BY oi.created_at ASC
     `;
 
     const itemsResult = await pool.query(orderItemsSql, [orderId]);
 
+    const items = itemsResult.rows.map((item) => ({
+      product_id: item.product_id,
+      product_name: item.product_name,
+      unit_price: Number(item.unit_price),
+      quantity: Number(item.quantity),
+      line_total: Number(item.line_total),
+    }));
+
+    const subtotal = items.reduce((sum, item) => sum + item.line_total, 0);
+
     res.json({
-      order: {
-        id: order.id,
-        status: order.status,
-        subtotal: order.subtotal,
-        delivery_fee: order.delivery_fee,
-        total: order.total,
-        created_at: order.created_at,
-        updated_at: order.updated_at,
+      id: order.id,
+      status: order.status,
+      created_at: order.created_at,
+      subtotal,
+      delivery_fee: 0,
+      total: subtotal,
+      rejection_reason: order.rejection_reason,
+      shop: {
+        id: order.shop_id,
+        name: order.shop_name,
+        phone: order.shop_phone,
+      },
+      customer: {
+        id: order.customer_id,
+        name: order.customer_name,
+        phone: order.customer_phone,
       },
       address: {
+        id: order.address_id,
         label: order.address_label || 'Delivery Address',
         address_line: order.address_line || order.delivery_address,
       },
-      items: itemsResult.rows.map((item) => ({
-        product_id: item.product_id,
-        product_name: item.product_name,
-        price: item.price,
-        quantity: item.quantity,
-        line_total: item.line_total,
-      })),
+      items,
     });
   } catch (err) {
     console.error('Get Order Details For User Error:', err);

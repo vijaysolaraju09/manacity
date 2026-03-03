@@ -125,12 +125,13 @@ const getOrderDetailsForBusiness = async (req, res, next) => {
       SELECT
         o.id,
         o.status,
-        o.subtotal,
-        o.delivery_fee,
-        o.total,
         o.created_at,
-        o.updated_at,
+        o.rejection_reason,
+        o.shop_id,
+        s.name AS shop_name,
+        s.phone AS shop_phone,
         o.delivery_address,
+        a.id AS address_id,
         a.label AS address_label,
         a.address_line,
         u.id AS customer_id,
@@ -150,7 +151,7 @@ const getOrderDetailsForBusiness = async (req, res, next) => {
 
     if (orderResult.rowCount === 0) {
       logOrderEvent(req, 'warn', 'business_order_details_not_found', orderId, userId);
-      return next(createError(404, 'ORDER_NOT_FOUND', 'Order not found'));
+      return next(createError(404, 'ORDER_NOT_FOUND_FOR_BUSINESS', 'Order not found for this business'));
     }
 
     const order = orderResult.rows[0];
@@ -158,11 +159,12 @@ const getOrderDetailsForBusiness = async (req, res, next) => {
     const orderItemsSql = `
       SELECT
         oi.product_id,
-        oi.name_snapshot AS product_name,
-        oi.price_snapshot AS price,
+        COALESCE(p.name, oi.name_snapshot) AS product_name,
+        oi.price_snapshot AS unit_price,
         oi.quantity,
-        oi.line_total
+        (oi.quantity * oi.price_snapshot) AS line_total
       FROM order_items oi
+      LEFT JOIN products p ON p.id = oi.product_id
       WHERE oi.order_id = $1
       ORDER BY oi.created_at ASC
     `;
@@ -171,32 +173,40 @@ const getOrderDetailsForBusiness = async (req, res, next) => {
 
     logOrderEvent(req, 'info', 'business_order_details_fetched', orderId, userId);
 
+    const items = orderItemsResult.rows.map((item) => ({
+      product_id: item.product_id,
+      product_name: item.product_name,
+      unit_price: Number(item.unit_price),
+      quantity: Number(item.quantity),
+      line_total: Number(item.line_total),
+    }));
+
+    const subtotal = items.reduce((sum, item) => sum + item.line_total, 0);
+
     res.json({
-      order: {
-        id: order.id,
-        status: order.status,
-        subtotal: order.subtotal,
-        delivery_fee: order.delivery_fee,
-        total: order.total,
-        created_at: order.created_at,
-        updated_at: order.updated_at,
+      id: order.id,
+      status: order.status,
+      created_at: order.created_at,
+      subtotal,
+      delivery_fee: 0,
+      total: subtotal,
+      rejection_reason: order.rejection_reason,
+      shop: {
+        id: order.shop_id,
+        name: order.shop_name,
+        phone: order.shop_phone,
       },
-      address: {
-        label: order.address_label || 'Delivery Address',
-        address_line: order.address_line || order.delivery_address,
-      },
-      items: orderItemsResult.rows.map((item) => ({
-        product_id: item.product_id,
-        product_name: item.product_name,
-        price: item.price,
-        quantity: item.quantity,
-        line_total: item.line_total,
-      })),
       customer: {
         id: order.customer_id,
         name: order.customer_name,
         phone: order.customer_phone,
       },
+      address: {
+        id: order.address_id,
+        label: order.address_label || 'Delivery Address',
+        address_line: order.address_line || order.delivery_address,
+      },
+      items,
     });
   } catch (err) {
     logOrderEvent(req, 'error', 'business_order_details_failed', req.params.orderId, req.user ? req.user.user_id : null, { message: err.message });
