@@ -1,7 +1,9 @@
 const { query } = require('../config/db');
 const { sendNotification } = require('../services/notificationService');
+const { createError } = require('../utils/errors');
+const { logOrderEvent } = require('./shopOrderController');
 
-const getPendingOrders = async (req, res) => {
+const getPendingOrders = async (req, res, next) => {
   try {
     const { user_id } = req.user;
     const locationId = req.locationId;
@@ -20,24 +22,25 @@ const getPendingOrders = async (req, res) => {
     const { rows } = await query(sql, [user_id, locationId]);
     res.json(rows);
   } catch (err) {
-    console.error('Get Pending Orders Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
 
-const updateOrderStatus = async (req, res, newStatus) => {
+const updateOrderStatus = async (req, res, next, newStatus) => {
   try {
     const { orderId } = req.params;
     const { user_id } = req.user;
     const locationId = req.locationId;
-    const { reason } = req.body;
+    const { reason } = req.body || {};
 
-    // 1. Validate Input
-    if (newStatus === 'REJECTED' && reason && reason.length > 200) {
-      return res.status(400).json({ error: 'Reason must be 200 characters or less' });
+    if (!orderId) {
+      return next(createError(400, 'ORDER_ID_REQUIRED', 'orderId is required'));
     }
 
-    // 2. Validate Order Existence, Ownership, and Status
+    if (newStatus === 'REJECTED' && reason && reason.length > 200) {
+      return next(createError(400, 'REJECTION_REASON_TOO_LONG', 'Reason must be 200 characters or less'));
+    }
+
     const checkSql = `
       SELECT o.id, o.status, s.owner_id
       FROM orders o
@@ -47,20 +50,21 @@ const updateOrderStatus = async (req, res, newStatus) => {
     const checkRes = await query(checkSql, [orderId, locationId]);
 
     if (checkRes.rows.length === 0) {
-      return res.status(404).json({ error: 'Order not found in this location' });
+      logOrderEvent(req, 'warn', 'business_order_status_not_found', orderId, user_id);
+      return next(createError(404, 'ORDER_NOT_FOUND', 'Order not found in this location'));
     }
 
     const order = checkRes.rows[0];
 
     if (order.owner_id !== user_id) {
-      return res.status(403).json({ error: 'You do not own the shop for this order' });
+      logOrderEvent(req, 'warn', 'business_order_status_forbidden', orderId, user_id);
+      return next(createError(403, 'ORDER_FORBIDDEN', 'You do not own the shop for this order'));
     }
 
     if (order.status !== 'PENDING') {
-      return res.status(409).json({ error: `Order is already ${order.status}` });
+      return next(createError(400, 'ORDER_STATUS_INVALID', `Only PENDING orders can be ${newStatus.toLowerCase()}`));
     }
 
-    // 3. Update Order
     let updateSql;
     let params;
 
@@ -96,7 +100,8 @@ const updateOrderStatus = async (req, res, newStatus) => {
 
       if (detailsRes.rows.length > 0) {
         const { shop_name, phone, user_id: buyerId } = detailsRes.rows[0];
-        let type, message;
+        let type;
+        let message;
 
         if (newStatus === 'ACCEPTED') {
           type = 'ORDER_ACCEPTED';
@@ -112,24 +117,27 @@ const updateOrderStatus = async (req, res, newStatus) => {
       }
     }
 
-    res.json(updateRes.rows[0]);
+    logOrderEvent(req, 'info', 'business_order_status_updated', orderId, user_id, { next_status: newStatus });
 
+    res.json(updateRes.rows[0]);
   } catch (err) {
-    console.error(`Update Order Status (${newStatus}) Error:`, err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    logOrderEvent(req, 'error', 'business_order_status_update_failed', req.params.orderId, req.user ? req.user.user_id : null, {
+      next_status: newStatus,
+      message: err.message,
+    });
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
 
-const acceptOrder = (req, res) => updateOrderStatus(req, res, 'ACCEPTED');
-const rejectOrder = (req, res) => updateOrderStatus(req, res, 'REJECTED');
+const acceptOrder = (req, res, next) => updateOrderStatus(req, res, next, 'ACCEPTED');
+const rejectOrder = (req, res, next) => updateOrderStatus(req, res, next, 'REJECTED');
 
-const deliverOrder = async (req, res) => {
+const deliverOrder = async (req, res, next) => {
   try {
     const { orderId } = req.params;
     const { user_id } = req.user;
     const locationId = req.locationId;
 
-    // 1. Validate Order Existence, Ownership, and Status
     const checkSql = `
       SELECT o.id, o.status, s.owner_id
       FROM orders o
@@ -139,20 +147,19 @@ const deliverOrder = async (req, res) => {
     const checkRes = await query(checkSql, [orderId, locationId]);
 
     if (checkRes.rows.length === 0) {
-      return res.status(404).json({ error: 'Order not found in this location' });
+      return next(createError(404, 'ORDER_NOT_FOUND', 'Order not found in this location'));
     }
 
     const order = checkRes.rows[0];
 
     if (order.owner_id !== user_id) {
-      return res.status(403).json({ error: 'You do not own the shop for this order' });
+      return next(createError(403, 'ORDER_FORBIDDEN', 'You do not own the shop for this order'));
     }
 
     if (order.status !== 'ACCEPTED') {
-      return res.status(409).json({ error: `Order must be ACCEPTED to be delivered. Current status: ${order.status}` });
+      return next(createError(400, 'ORDER_STATUS_INVALID', `Order must be ACCEPTED to be delivered. Current status: ${order.status}`));
     }
 
-    // 2. Update Order
     const updateSql = `
       UPDATE orders
       SET status = 'DELIVERED', delivered_at = NOW(), updated_at = NOW()
@@ -163,8 +170,7 @@ const deliverOrder = async (req, res) => {
 
     res.json(updateRes.rows[0]);
   } catch (err) {
-    console.error('Deliver Order Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
 
