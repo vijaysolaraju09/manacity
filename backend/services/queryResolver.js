@@ -1,8 +1,18 @@
-const itemAliases = require('../data/itemAliases.json');
+const fs = require('fs');
+const path = require('path');
 
 const ENABLE_LLM_FALLBACK = /^true$/i.test(process.env.ENABLE_LLM_FALLBACK || 'false');
 const DEBUG_QUERY_RESOLVER = /^true$/i.test(process.env.DEBUG_QUERY_RESOLVER || 'false');
 const FUZZY_MIN_THRESHOLD = Number(process.env.QUERY_FUZZY_THRESHOLD || 0.72);
+
+const ALIASES_DIR = path.join(__dirname, '..', 'data', 'aliases');
+const LEGACY_ALIASES_FILE = path.join(__dirname, '..', 'data', 'itemAliases.json');
+const FILE_PRIORITY = [
+    'vegetables.json', 'fruits.json', 'groceries.json', 'spices_masalas.json', 'dairy_bakery.json',
+    'snacks_beverages.json', 'pickles_podis.json', 'household_cleaning.json', 'personal_care.json',
+    'baby_care.json', 'stationary.json', 'fancy_store.json', 'disposable_party.json', 'hotel_tiffin.json',
+    'electrical.json', 'plumbing.json', 'tools_hardware.json'
+];
 
 function normalizeQuery(q) {
     if (typeof q !== 'string') {
@@ -16,6 +26,159 @@ function normalizeQuery(q) {
         .replace(/\s+/g, ' ')
         .trim();
 }
+
+function debugWarn(message, context) {
+    if (!DEBUG_QUERY_RESOLVER) {
+        return;
+    }
+
+    console.warn('[QueryResolver]', message, context || {});
+}
+
+function safeLoadJson(filePath) {
+    try {
+        const raw = fs.readFileSync(filePath, 'utf8');
+        const parsed = JSON.parse(raw);
+
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            debugWarn('Skipping aliases file with invalid root object.', { file: path.basename(filePath) });
+            return null;
+        }
+
+        return parsed;
+    } catch (error) {
+        debugWarn('Skipping aliases file due to read/parse failure.', {
+            file: path.basename(filePath),
+            error: error && error.message ? error.message : 'Unknown error'
+        });
+        return null;
+    }
+}
+
+function loadAliasesFromFolder() {
+    if (!fs.existsSync(ALIASES_DIR)) {
+        return null;
+    }
+
+    let folderEntries;
+    try {
+        folderEntries = fs.readdirSync(ALIASES_DIR);
+    } catch (error) {
+        debugWarn('Unable to read aliases folder.', {
+            folder: ALIASES_DIR,
+            error: error && error.message ? error.message : 'Unknown error'
+        });
+        return null;
+    }
+
+    const jsonFiles = folderEntries.filter((fileName) => fileName.endsWith('.json'));
+    if (jsonFiles.length === 0) {
+        return null;
+    }
+
+    const fileOrder = [
+        ...FILE_PRIORITY.filter((fileName) => jsonFiles.includes(fileName)),
+        ...jsonFiles.filter((fileName) => !FILE_PRIORITY.includes(fileName)).sort()
+    ];
+
+    const mergedAliases = {};
+    const canonicalOrder = new Map();
+    let canonicalCounter = 0;
+
+    fileOrder.forEach((fileName) => {
+        const filePath = path.join(ALIASES_DIR, fileName);
+        const parsed = safeLoadJson(filePath);
+
+        if (!parsed) {
+            return;
+        }
+
+        Object.entries(parsed).forEach(([canonical, aliases]) => {
+            if (typeof canonical !== 'string') {
+                return;
+            }
+
+            const canonicalKey = canonical.trim();
+            if (!canonicalKey) {
+                return;
+            }
+
+            if (!canonicalOrder.has(canonicalKey)) {
+                canonicalOrder.set(canonicalKey, canonicalCounter);
+                canonicalCounter += 1;
+            }
+
+            if (!Array.isArray(aliases)) {
+                debugWarn('Skipping canonical aliases that are not an array.', {
+                    file: fileName,
+                    canonical: canonicalKey
+                });
+                return;
+            }
+
+            if (!mergedAliases[canonicalKey]) {
+                mergedAliases[canonicalKey] = [];
+            }
+
+            const mergedSet = new Set(mergedAliases[canonicalKey]);
+            aliases.forEach((alias) => {
+                if (typeof alias !== 'string') {
+                    return;
+                }
+
+                const trimmedAlias = alias.trim();
+                if (!trimmedAlias) {
+                    return;
+                }
+
+                mergedSet.add(trimmedAlias);
+            });
+            mergedAliases[canonicalKey] = Array.from(mergedSet);
+        });
+    });
+
+    if (Object.keys(mergedAliases).length === 0) {
+        return null;
+    }
+
+    return {
+        itemAliases: mergedAliases,
+        canonicalOrder
+    };
+}
+
+function loadLegacyAliases() {
+    const parsed = safeLoadJson(LEGACY_ALIASES_FILE);
+    if (!parsed) {
+        return {
+            itemAliases: {},
+            canonicalOrder: new Map()
+        };
+    }
+
+    const canonicalOrder = new Map();
+    let index = 0;
+    Object.keys(parsed).forEach((canonical) => {
+        canonicalOrder.set(canonical, index);
+        index += 1;
+    });
+
+    return {
+        itemAliases: parsed,
+        canonicalOrder
+    };
+}
+
+function loadItemAliases() {
+    const folderAliases = loadAliasesFromFolder();
+    if (folderAliases) {
+        return folderAliases;
+    }
+
+    return loadLegacyAliases();
+}
+
+const { itemAliases, canonicalOrder } = loadItemAliases();
 
 function levenshtein(a, b) {
     if (a === b) return 0;
@@ -84,20 +247,61 @@ function aliasScore(query, alias) {
     return (editSimilarity * 0.75) + (tokenSimilarity * 0.25);
 }
 
+function isPreferredCanonical(currentCanonical, nextCanonical) {
+    const currentOrder = canonicalOrder.has(currentCanonical)
+        ? canonicalOrder.get(currentCanonical)
+        : Number.MAX_SAFE_INTEGER;
+    const nextOrder = canonicalOrder.has(nextCanonical)
+        ? canonicalOrder.get(nextCanonical)
+        : Number.MAX_SAFE_INTEGER;
+
+    return nextOrder < currentOrder;
+}
+
 function buildAliasIndex() {
     const index = new Map();
 
     Object.entries(itemAliases).forEach(([canonical, aliases]) => {
         const canonicalNorm = normalizeQuery(canonical);
-        if (canonicalNorm) {
+        if (canonicalNorm && !index.has(canonicalNorm)) {
             index.set(canonicalNorm, canonical);
+        }
+
+        if (!Array.isArray(aliases)) {
+            return;
         }
 
         aliases.forEach((alias) => {
             const normalizedAlias = normalizeQuery(alias);
-            if (normalizedAlias) {
-                index.set(normalizedAlias, canonical);
+            if (!normalizedAlias) {
+                return;
             }
+
+            const existingCanonical = index.get(normalizedAlias);
+            if (!existingCanonical) {
+                index.set(normalizedAlias, canonical);
+                return;
+            }
+
+            if (existingCanonical === canonical) {
+                return;
+            }
+
+            if (isPreferredCanonical(existingCanonical, canonical)) {
+                debugWarn('Duplicate alias normalized mapping detected; choosing preferred canonical.', {
+                    alias: normalizedAlias,
+                    chosenCanonical: canonical,
+                    skippedCanonical: existingCanonical
+                });
+                index.set(normalizedAlias, canonical);
+                return;
+            }
+
+            debugWarn('Duplicate alias normalized mapping detected; keeping existing canonical.', {
+                alias: normalizedAlias,
+                chosenCanonical: existingCanonical,
+                skippedCanonical: canonical
+            });
         });
     });
 
@@ -181,7 +385,7 @@ function resolveQuery(q) {
 
     const rankedCanonicals = Object.entries(itemAliases)
         .map(([canonical, aliases]) => {
-            const candidates = [canonical, ...aliases];
+            const candidates = Array.isArray(aliases) ? [canonical, ...aliases] : [canonical];
             let best = 0;
 
             candidates.forEach((candidate) => {

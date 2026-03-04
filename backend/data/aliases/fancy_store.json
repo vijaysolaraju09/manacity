@@ -1,0 +1,13 @@
+{
+  "perfume": ["perfume","attar","fragrance"],
+  "lipstick": ["lipstick","lip stick"],
+  "powder": ["powder","compact"],
+  "foundation": ["foundation","base makeup"],
+  "nail polish": ["nail polish","nail paint"],
+  "hair clip": ["hair clip","clip","hair pin"],
+  "bangles": ["bangles","golusu","choori"],
+  "earrings": ["earrings","jhumka","tops"],
+  "gift": ["gift","gifts","present"],
+  "wallet": ["wallet","purse"],
+  "belt": ["belt","belts"]
+}

@@ -1,0 +1,14 @@
+{
+  "idli": ["idli","idly","iddli"],
+  "dosa": ["dosa","dosai","dose"],
+  "vada": ["vada","garelu","medu vada"],
+  "poori": ["poori","puri"],
+  "upma": ["upma"],
+  "pongal": ["pongal"],
+  "biryani": ["biryani","biriyani"],
+  "fried rice": ["fried rice","fry rice"],
+  "noodles": ["noodles","hakka noodles"],
+  "tea": ["tea","chai"],
+  "coffee": ["coffee","kaapi"],
+  "snacks": ["snacks","tiffin","tifin","tiffins"]
+}

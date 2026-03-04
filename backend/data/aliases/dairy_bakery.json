@@ -1,0 +1,16 @@
+{
+  "milk": ["milk","paalu","doodh"],
+  "curd": ["curd","perugu","dahi","yogurt"],
+  "buttermilk": ["buttermilk","majiga","chaas"],
+  "paneer": ["paneer","paneer cubes"],
+  "butter": ["butter","venna"],
+  "cheese": ["cheese","cheese slices"],
+  "ghee": ["ghee","neyyi"],
+
+  "bread": ["bread","double roti"],
+  "buns": ["buns","bun","pav","paav"],
+  "cake": ["cake","pastry","cup cake","cupcake"],
+  "biscuits": ["biscuits","cookies","biskut"],
+  "rusks": ["rusks","rusk","toast"],
+  "ice cream": ["ice cream","icecream","kulfi"]
+}

@@ -1,0 +1,21 @@
+{
+  "banana": ["banana","bananas","arati pandu","arati","kela","keli"],
+  "apple": ["apple","apples","sebu"],
+  "orange": ["orange","oranges","kamala pandu","santra","narangi"],
+  "grapes": ["grapes","draksha","angoor"],
+  "mango": ["mango","mangoes","mamidi pandu","aam"],
+  "watermelon": ["watermelon","puchakaya","tarbooz"],
+  "papaya": ["papaya","boppayi","boppayi pandu"],
+  "guava": ["guava","jama","peru","amrud"],
+  "pomegranate": ["pomegranate","danimma","anar"],
+  "pineapple": ["pineapple","ananasa","ananas"],
+  "mosambi": ["mosambi","sweet lime","battayi"],
+  "custard apple": ["custard apple","sitaphal","seetha phalam","seethaphal"],
+  "strawberry": ["strawberry","strawberries"],
+  "dates": ["dates","khajur","khajoora"],
+  "dry fruits": ["dry fruits","dryfruits","dr yfruits","nuts"],
+  "almonds": ["almonds","badam"],
+  "cashew": ["cashew","kaju"],
+  "raisins": ["raisins","kishmish"],
+  "walnut": ["walnut","akhrot"]
+}

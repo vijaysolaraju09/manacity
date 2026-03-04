@@ -1,0 +1,16 @@
+{
+  "hammer": ["hammer","hammar"],
+  "screwdriver": ["screwdriver","driver","screw driver"],
+  "spanner": ["spanner","wrench"],
+  "plier": ["plier","pliers"],
+  "drill machine": ["drill","drill machine"],
+  "cutter": ["cutter","blade"],
+  "nails": ["nails","nail"],
+  "screws": ["screws","screw"],
+  "nuts bolts": ["nuts bolts","nut bolt","bolt","bolts"],
+  "rope": ["rope","thadu","tadu","rassi"],
+  "paint brush": ["paint brush","brush"],
+  "paint": ["paint","wall paint"],
+  "fevicol": ["fevicol","glue"],
+  "sealant": ["sealant","mseal","m-seal"]
+}
