@@ -46,6 +46,8 @@ function buildSearchTerms(rawQuery, resolved) {
 
 exports.search = async (req, res, next) => {
     try {
+        const requestId = req.request_id || req.get('X-Request-Id');
+        const userId = req.user ? req.user.user_id : null;
         const q = typeof req.query.q === 'string' ? req.query.q : '';
         const mode = typeof req.query.mode === 'string' && req.query.mode
             ? req.query.mode
@@ -122,7 +124,7 @@ exports.search = async (req, res, next) => {
                     shop: {
                         id: row.shop_id,
                         name: row.shop_name,
-                        is_open: row.shop_is_open
+                        is_open: typeof row.shop_is_open === 'boolean' ? row.shop_is_open : null
                     },
                     products: []
                 });
@@ -149,7 +151,11 @@ exports.search = async (req, res, next) => {
                 ORDER BY s.name ASC
             `;
             const shopsResult = await query(shopsSql, [locationId, likePatterns]);
-            matchingShops = shopsResult.rows;
+            matchingShops = shopsResult.rows.map((shop) => ({
+                id: shop.id,
+                name: shop.name,
+                is_open: typeof shop.is_open === 'boolean' ? shop.is_open : null
+            }));
         }
 
         let matchingServices = [];
@@ -168,7 +174,12 @@ exports.search = async (req, res, next) => {
                 const servicesResult = await query(servicesSql, [locationId, likePatterns]);
                 matchingServices = servicesResult.rows;
             } catch (serviceError) {
-                console.error('Mobile search services lookup failed:', serviceError.message);
+                console.error(JSON.stringify({
+                    level: 'error',
+                    request_id: requestId,
+                    user_id: userId,
+                    reason: 'MOBILE_SEARCH_SERVICES_LOOKUP_FAILED'
+                }));
                 matchingServices = [];
             }
         }
@@ -188,7 +199,12 @@ exports.search = async (req, res, next) => {
             matching_services: matchingServices
         });
     } catch (error) {
-        console.error('Mobile search failed:', error);
+        console.error(JSON.stringify({
+            level: 'error',
+            request_id: req.request_id || req.get('X-Request-Id'),
+            user_id: req.user ? req.user.user_id : null,
+            reason: 'MOBILE_SEARCH_FAILED'
+        }));
         return next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
     }
 };

@@ -4,6 +4,9 @@ const { createError } = require('../../utils/errors');
 
 const MIN_LABEL_LENGTH = 3;
 const MIN_ADDRESS_LENGTH = 5;
+const INVALID_ITEMS_CODE = 'QUICK_ORDER_INVALID_ITEMS';
+const ADDRESS_REQUIRED_CODE = 'QUICK_ORDER_ADDRESS_REQUIRED';
+const OUT_OF_STOCK_CODE = 'QUICK_ORDER_OUT_OF_STOCK';
 
 const normalizePayload = (body = {}) => {
   const shopId = body.shopId || body.shop_id;
@@ -29,8 +32,7 @@ const normalizePayload = (body = {}) => {
 const validateAddress = (address) => {
   if (!address || typeof address !== 'object' || Array.isArray(address)) {
     return {
-      field: 'address',
-      code: 'QUICK_ORDER_ADDRESS_REQUIRED',
+      code: ADDRESS_REQUIRED_CODE,
       message: 'address is required when address_id is not provided',
     };
   }
@@ -38,19 +40,10 @@ const validateAddress = (address) => {
   const label = typeof address.label === 'string' ? address.label.trim() : '';
   const addressLine = typeof address.address_line === 'string' ? address.address_line.trim() : '';
 
-  if (label.length < MIN_LABEL_LENGTH) {
+  if (label.length < MIN_LABEL_LENGTH || addressLine.length < MIN_ADDRESS_LENGTH) {
     return {
-      field: 'address.label',
-      code: 'QUICK_ORDER_ADDRESS_LABEL_INVALID',
-      message: `address.label must be at least ${MIN_LABEL_LENGTH} characters`,
-    };
-  }
-
-  if (addressLine.length < MIN_ADDRESS_LENGTH) {
-    return {
-      field: 'address.address_line',
-      code: 'QUICK_ORDER_ADDRESS_LINE_INVALID',
-      message: `address.address_line must be at least ${MIN_ADDRESS_LENGTH} characters`,
+      code: ADDRESS_REQUIRED_CODE,
+      message: 'address requires valid label and address_line',
     };
   }
 
@@ -59,11 +52,11 @@ const validateAddress = (address) => {
 
 const validatePayload = ({ shopId, addressId, items, address }) => {
   if (!shopId) {
-    return { field: 'shop_id', code: 'QUICK_ORDER_SHOP_REQUIRED', message: 'shop_id is required' };
+    return { code: INVALID_ITEMS_CODE, message: 'shop_id is required' };
   }
 
   if (!Array.isArray(items) || items.length === 0) {
-    return { field: 'items', code: 'QUICK_ORDER_ITEMS_REQUIRED', message: 'items must be a non-empty array' };
+    return { code: INVALID_ITEMS_CODE, message: 'items must be a non-empty array' };
   }
 
   for (let index = 0; index < items.length; index += 1) {
@@ -71,8 +64,7 @@ const validatePayload = ({ shopId, addressId, items, address }) => {
 
     if (!item.productId) {
       return {
-        field: `items[${index}].product_id`,
-        code: 'QUICK_ORDER_ITEM_PRODUCT_REQUIRED',
+        code: INVALID_ITEMS_CODE,
         message: `items[${index}].product_id is required`,
       };
     }
@@ -80,8 +72,7 @@ const validatePayload = ({ shopId, addressId, items, address }) => {
     const quantity = Number(item.quantity);
     if (!Number.isInteger(quantity) || quantity <= 0) {
       return {
-        field: `items[${index}].quantity`,
-        code: 'QUICK_ORDER_ITEM_QUANTITY_INVALID',
+        code: INVALID_ITEMS_CODE,
         message: `items[${index}].quantity must be a positive integer`,
       };
     }
@@ -146,11 +137,18 @@ const createAddressForQuickOrder = async ({ client, userId, locationId, address 
   return insertRes.rows[0];
 };
 
+const isStockFailureMessage = (message = '') => {
+  const lowered = String(message).toLowerCase();
+  return lowered.includes('out of stock') || lowered.includes('insufficient stock');
+};
+
 exports.createQuickOrder = async (req, res, next) => {
   const client = await pool.connect();
+  const requestId = req.request_id || req.get('X-Request-Id');
+  const userId = req.user.user_id;
+
   try {
     const locationId = req.locationId;
-    const userId = req.user.user_id;
     const payload = normalizePayload(req.body);
 
     const payloadError = validatePayload(payload);
@@ -163,19 +161,23 @@ exports.createQuickOrder = async (req, res, next) => {
     const cartResult = await validateCartItems(payload.items, locationId, client.query.bind(client));
     if (cartResult.error) {
       await client.query('ROLLBACK');
-      return next(createError(400, 'QUICK_ORDER_CART_VALIDATION_FAILED', cartResult.error));
+      if (isStockFailureMessage(cartResult.error)) {
+        return next(createError(400, OUT_OF_STOCK_CODE, cartResult.error));
+      }
+      return next(createError(400, INVALID_ITEMS_CODE, cartResult.error));
     }
 
     if (!cartResult.isShopOpen) {
       await client.query('ROLLBACK');
-      return next(createError(400, 'QUICK_ORDER_SHOP_CLOSED', 'Shop is currently closed'));
+      return next(createError(400, INVALID_ITEMS_CODE, 'Shop is currently closed'));
     }
 
-    const { shopId, subtotal, deliveryFee, total, items: validatedItems } = cartResult;
+    const { shopId, subtotal, items: validatedItems } = cartResult;
+    const deliveryFee = 0;
 
     if (String(payload.shopId) !== String(shopId)) {
       await client.query('ROLLBACK');
-      return next(createError(400, 'QUICK_ORDER_SHOP_ID_MISMATCH', 'shop_id does not match cart items'));
+      return next(createError(400, INVALID_ITEMS_CODE, 'shop_id does not match cart items'));
     }
 
     const productIds = [...new Set(validatedItems.map((item) => item.productId))];
@@ -193,13 +195,13 @@ exports.createQuickOrder = async (req, res, next) => {
       const product = stockByProductId.get(item.productId);
       if (!product) {
         await client.query('ROLLBACK');
-        return next(createError(400, 'QUICK_ORDER_PRODUCT_NOT_FOUND', `Product ${item.productId} not found`));
+        return next(createError(400, INVALID_ITEMS_CODE, `Product ${item.productId} not found`));
       }
 
       const stockQuantity = Number(product.stock_quantity);
       if (Number.isFinite(stockQuantity) && stockQuantity < item.quantity) {
         await client.query('ROLLBACK');
-        return next(createError(400, 'QUICK_ORDER_STOCK_INSUFFICIENT', `Insufficient stock for ${product.name}`));
+        return next(createError(400, OUT_OF_STOCK_CODE, `Insufficient stock for ${product.name}`));
       }
     }
 
@@ -221,7 +223,7 @@ exports.createQuickOrder = async (req, res, next) => {
 
       if (addressRes.rowCount === 0) {
         await client.query('ROLLBACK');
-        return next(createError(400, 'QUICK_ORDER_ADDRESS_NOT_FOUND', 'address_id not found'));
+        return next(createError(400, ADDRESS_REQUIRED_CODE, 'address_id not found'));
       }
 
       resolvedAddressId = addressRes.rows[0].id;
@@ -255,7 +257,7 @@ exports.createQuickOrder = async (req, res, next) => {
           updated_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', 'COD', $7, $8, NOW(), NOW())
-        RETURNING id, status
+        RETURNING id, subtotal, delivery_fee, total, status
       `,
       [
         userId,
@@ -263,7 +265,7 @@ exports.createQuickOrder = async (req, res, next) => {
         locationId,
         subtotal,
         deliveryFee,
-        total,
+        subtotal,
         resolvedDeliveryAddress,
         resolvedAddressId,
       ]
@@ -307,13 +309,18 @@ exports.createQuickOrder = async (req, res, next) => {
         id: orderId,
         subtotal,
         delivery_fee: deliveryFee,
-        total,
+        total: subtotal,
         status: orderRes.rows[0].status || 'PENDING',
       },
     });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('Quick order placement error:', err);
+    console.error(JSON.stringify({
+      level: 'error',
+      request_id: requestId,
+      user_id: userId,
+      reason: 'QUICK_ORDER_PLACEMENT_ERROR'
+    }));
     return next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   } finally {
     client.release();
