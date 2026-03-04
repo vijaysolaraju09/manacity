@@ -44,6 +44,33 @@ const toNumeric = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const mapBusinessOrderSummary = (order) => {
+  const subtotal = toNumeric(order.subtotal, 0);
+  const deliveryFee = toNumeric(order.delivery_fee, 0);
+  const total = toNumeric(order.total, subtotal + deliveryFee);
+  const itemCount = Number.parseInt(order.item_count, 10);
+
+  return {
+    id: order.id,
+    status: order.status,
+    created_at: order.created_at,
+    subtotal,
+    delivery_fee: deliveryFee,
+    total,
+    item_count: Number.isFinite(itemCount) ? itemCount : 0,
+    customer: {
+      id: order.customer_id,
+      name: order.customer_name,
+      phone: order.customer_phone,
+    },
+    shop: {
+      id: order.shop_id,
+      name: order.shop_name,
+      phone: order.shop_phone,
+    },
+  };
+};
+
 const validateBusinessUser = (req, next) => {
   if (!req.user || req.user.role !== ROLES.BUSINESS) {
     next(createError(403, 'AUTH_FORBIDDEN', 'Only business users can manage received orders'));
@@ -81,42 +108,40 @@ const getReceivedOrders = async (req, res, next) => {
       SELECT
         o.id,
         o.status,
-        o.total,
-        o.subtotal,
-        o.delivery_fee,
         o.created_at,
         o.updated_at,
+        o.shop_id,
+        s.name AS shop_name,
+        s.phone AS shop_phone,
         u.id AS customer_id,
         u.name AS customer_name,
-        u.phone AS customer_phone
+        u.phone AS customer_phone,
+        COALESCE(SUM(oi.quantity * oi.price_snapshot), 0)::numeric AS subtotal,
+        0::numeric AS delivery_fee,
+        COALESCE(SUM(oi.quantity * oi.price_snapshot), 0)::numeric AS total,
+        COALESCE(SUM(oi.quantity), 0)::int AS item_count
       FROM orders o
       JOIN shops s ON s.id = o.shop_id
       JOIN users u ON u.id = o.user_id
+      LEFT JOIN order_items oi ON oi.order_id = o.id
       WHERE s.owner_id = $1
         AND o.location_id = $2
         AND o.deleted_at IS NULL
         AND ($3::text[] IS NULL OR o.status = ANY($3::text[]))
+      GROUP BY o.id, s.id, s.name, s.phone, u.id, u.name, u.phone
       ORDER BY o.created_at DESC
       LIMIT $4 OFFSET $5
     `;
 
     const { rows } = await query(sql, [userId, locationId, statuses, limit, offset]);
+    console.info(JSON.stringify({
+      request_id: req.request_id || req.get('X-Request-Id'),
+      user_id: userId,
+      count: rows.length,
+    }));
 
     res.json({
-      orders: rows.map((row) => ({
-        id: row.id,
-        status: row.status,
-        total: row.total,
-        subtotal: row.subtotal,
-        delivery_fee: row.delivery_fee,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-        customer: {
-          id: row.customer_id,
-          name: row.customer_name,
-          phone: row.customer_phone,
-        },
-      })),
+      orders: rows.map(mapBusinessOrderSummary),
       pagination: {
         page,
         limit,
@@ -155,9 +180,10 @@ const getOrderDetailsForBusiness = async (req, res, next) => {
         u.id AS customer_id,
         u.name AS customer_name,
         u.phone AS customer_phone,
-        COALESCE(SUM(oi.line_total), 0)::numeric AS subtotal,
+        COALESCE(SUM(oi.quantity * oi.price_snapshot), 0)::numeric AS subtotal,
         0::numeric AS delivery_fee,
-        (COALESCE(SUM(oi.line_total), 0) + 0)::numeric AS total,
+        (COALESCE(SUM(oi.quantity * oi.price_snapshot), 0) + 0)::numeric AS total,
+        COALESCE(SUM(oi.quantity), 0)::int AS item_count,
         COALESCE(
           json_agg(
             json_build_object(
@@ -240,28 +266,11 @@ const getOrderDetailsForBusiness = async (req, res, next) => {
       };
     });
 
-    const subtotal = toNumeric(order.subtotal, items.reduce((sum, item) => sum + item.line_total, 0));
-    const deliveryFee = toNumeric(order.delivery_fee, 0);
-    const total = toNumeric(order.total, subtotal + deliveryFee);
+    const summary = mapBusinessOrderSummary(order);
 
     res.json({
-      id: order.id,
-      status: order.status,
-      created_at: order.created_at,
-      subtotal,
-      delivery_fee: deliveryFee,
-      total,
+      ...summary,
       rejection_reason: order.rejection_reason,
-      shop: {
-        id: order.shop_id,
-        name: order.shop_name,
-        phone: order.shop_phone,
-      },
-      customer: {
-        id: order.customer_id,
-        name: order.customer_name,
-        phone: order.customer_phone,
-      },
       address: {
         id: order.address_id,
         label: order.address_label || 'Delivery Address',

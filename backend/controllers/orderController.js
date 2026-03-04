@@ -1,6 +1,33 @@
 const { pool } = require('../config/db');
 const { createError } = require('../utils/errors');
 
+const toNumeric = (value, fallback = 0) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const mapCustomerOrderSummary = (order) => {
+  const subtotal = toNumeric(order.subtotal, 0);
+  const deliveryFee = toNumeric(order.delivery_fee, 0);
+  const total = toNumeric(order.total, subtotal + deliveryFee);
+  const itemCount = Number.parseInt(order.item_count, 10);
+
+  return {
+    id: order.id,
+    status: order.status,
+    created_at: order.created_at,
+    subtotal,
+    delivery_fee: deliveryFee,
+    total,
+    item_count: Number.isFinite(itemCount) ? itemCount : 0,
+    shop: {
+      id: order.shop_id,
+      name: order.shop_name,
+      phone: order.shop_phone,
+    },
+  };
+};
+
 const createOrder = async (req, res, next) => {
   const client = await pool.connect();
   try {
@@ -205,20 +232,17 @@ const getOrderDetailsForUser = async (req, res, next) => {
     }));
 
     const subtotal = items.reduce((sum, item) => sum + item.line_total, 0);
-
-    res.json({
-      id: order.id,
-      status: order.status,
-      created_at: order.created_at,
+    const summary = mapCustomerOrderSummary({
+      ...order,
       subtotal,
       delivery_fee: 0,
       total: subtotal,
+      item_count: items.reduce((sum, item) => sum + item.quantity, 0),
+    });
+
+    res.json({
+      ...summary,
       rejection_reason: order.rejection_reason,
-      shop: {
-        id: order.shop_id,
-        name: order.shop_name,
-        phone: order.shop_phone,
-      },
       customer: {
         id: order.customer_id,
         name: order.customer_name,
@@ -244,30 +268,34 @@ const getMyOrders = async (req, res, next) => {
 
     const sql = `
       SELECT
-        o.id, o.status, o.total, o.delivery_address, o.created_at, o.delivered_at,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'product_id', oi.product_id,
-              'name_snapshot', oi.name_snapshot,
-              'price_snapshot', oi.price_snapshot,
-              'quantity', oi.quantity,
-              'line_total', oi.line_total
-            )
-          ) FILTER (WHERE oi.id IS NOT NULL),
-          '[]'
-        ) as items
+        o.id,
+        o.status,
+        o.created_at,
+        o.shop_id,
+        s.name AS shop_name,
+        s.phone AS shop_phone,
+        COALESCE(SUM(oi.quantity * oi.price_snapshot), 0)::numeric AS subtotal,
+        0::numeric AS delivery_fee,
+        COALESCE(SUM(oi.quantity * oi.price_snapshot), 0)::numeric AS total,
+        COALESCE(SUM(oi.quantity), 0)::int AS item_count
       FROM orders o
+      JOIN shops s ON s.id = o.shop_id
       LEFT JOIN order_items oi ON o.id = oi.order_id
       WHERE o.user_id = $1
         AND o.location_id = $2
         AND o.deleted_at IS NULL
-      GROUP BY o.id
+      GROUP BY o.id, s.id, s.name, s.phone
       ORDER BY o.created_at DESC
     `;
 
     const { rows } = await pool.query(sql, [user_id, locationId]);
-    res.json(rows);
+    console.info(JSON.stringify({
+      request_id: req.request_id || req.get('X-Request-Id'),
+      user_id,
+      count: rows.length,
+    }));
+
+    res.json(rows.map(mapCustomerOrderSummary));
   } catch (err) {
     console.error('Get My Orders Error:', err);
     next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
