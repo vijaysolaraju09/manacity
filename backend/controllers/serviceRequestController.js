@@ -3,6 +3,9 @@ const { sendNotification } = require('../services/notificationService');
 const { parseLimit, parseCursor, makeNextCursor } = require('../utils/pagination');
 const ROLES = require('../utils/roles');
 
+const isUuid = (value) => typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
 
 exports.createRequest = async (req, res) => {
     try {
@@ -16,23 +19,70 @@ exports.createRequest = async (req, res) => {
         if (!description || !String(description).trim()) {
             return res.status(400).json({ error: 'description is required' });
         }
-        if (!category_id) {
-            return res.status(400).json({ error: 'category_id is required' });
-        }
 
-        const categoryQuery = `
-            SELECT id, is_active
-            FROM service_categories
-            WHERE id = $1 AND location_id = $2
-        `;
-        const categoryRes = await query(categoryQuery, [category_id, locationId]);
+        let resolvedCategoryId;
+        if (isUuid(category_id)) {
+            const categoryQuery = `
+                SELECT id, is_active
+                FROM service_categories
+                WHERE id = $1 AND location_id = $2
+            `;
+            const categoryRes = await query(categoryQuery, [category_id, locationId]);
 
-        if (categoryRes.rows.length === 0) {
-            return res.status(404).json({ error: 'Category not found in this location' });
-        }
+            if (categoryRes.rows.length === 0) {
+                return res.status(404).json({ error: 'Category not found in this location' });
+            }
 
-        if (!categoryRes.rows[0].is_active) {
-            return res.status(409).json({ error: 'Category is inactive' });
+            if (!categoryRes.rows[0].is_active) {
+                return res.status(409).json({ error: 'Category is inactive' });
+            }
+
+            resolvedCategoryId = categoryRes.rows[0].id;
+        } else {
+            try {
+                const generalCategoryQuery = `
+                    SELECT id
+                    FROM service_categories
+                    WHERE location_id = $1 AND LOWER(name) = LOWER($2)
+                    ORDER BY created_at ASC
+                    LIMIT 1
+                `;
+                const existingGeneralRes = await query(generalCategoryQuery, [locationId, 'General']);
+
+                if (existingGeneralRes.rows.length > 0) {
+                    resolvedCategoryId = existingGeneralRes.rows[0].id;
+                } else {
+                    const createGeneralQuery = `
+                        INSERT INTO service_categories (id, location_id, name, is_active)
+                        VALUES (gen_random_uuid(), $1, $2, true)
+                        RETURNING id
+                    `;
+                    const createdGeneralRes = await query(createGeneralQuery, [locationId, 'General']);
+                    resolvedCategoryId = createdGeneralRes.rows[0].id;
+                }
+
+                console.info(JSON.stringify({
+                    event: 'service_category_fallback',
+                    request_id: req.request_id || req.get('X-Request-Id'),
+                    user_id,
+                    location_id: locationId,
+                }));
+            } catch (categoryErr) {
+                console.error(JSON.stringify({
+                    level: 'error',
+                    request_id: req.request_id || req.get('X-Request-Id'),
+                    method: req.method,
+                    path: req.originalUrl,
+                    user_id,
+                    location_id: locationId,
+                    reason: 'SERVICE_CATEGORY_INVALID',
+                    error_message: categoryErr.message,
+                }));
+                return res.status(400).json({
+                    code: 'SERVICE_CATEGORY_INVALID',
+                    error: 'Unable to resolve service category',
+                });
+            }
         }
 
         let is_public = false;
@@ -55,7 +105,7 @@ exports.createRequest = async (req, res) => {
         const result = await query(insertQuery, [
             locationId,
             user_id,
-            category_id,
+            resolvedCategoryId,
             description,
             title,
             description,
