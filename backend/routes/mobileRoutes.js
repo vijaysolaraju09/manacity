@@ -4,6 +4,7 @@ const authMiddleware = require('../middlewares/authMiddleware');
 const homeController = require('../controllers/mobile/homeController');
 const userController = require('../controllers/mobile/userController');
 const searchController = require('../controllers/mobile/searchController');
+const quickOrderController = require('../controllers/mobile/quickOrderController');
 
 // Note: authMiddleware and locationMiddleware are applied globally in server.js
 // so this endpoint is already protected and scoped to a location.
@@ -42,5 +43,6 @@ router.get('/home', homeController.getHomeData);
 router.get('/search', authMiddleware, searchController.search);
 router.get('/me', authMiddleware, userController.getMobileMe);
 router.put('/me', authMiddleware, userController.updateMobileMe);
+router.post('/quick-order', authMiddleware, quickOrderController.createQuickOrder);
 
 module.exports = router;
