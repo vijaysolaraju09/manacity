@@ -3,6 +3,85 @@ const { sendNotification } = require('../services/notificationService');
 const { parseLimit, parseCursor, makeNextCursor } = require('../utils/pagination');
 const ROLES = require('../utils/roles');
 
+
+exports.createRequest = async (req, res) => {
+    try {
+        const { title, description, category_id, visibility, note } = req.body;
+        const { user_id } = req.user;
+        const locationId = req.locationId;
+
+        if (!title || !String(title).trim()) {
+            return res.status(400).json({ error: 'title is required' });
+        }
+        if (!description || !String(description).trim()) {
+            return res.status(400).json({ error: 'description is required' });
+        }
+        if (!category_id) {
+            return res.status(400).json({ error: 'category_id is required' });
+        }
+
+        const categoryQuery = `
+            SELECT id, is_active
+            FROM service_categories
+            WHERE id = $1 AND location_id = $2
+        `;
+        const categoryRes = await query(categoryQuery, [category_id, locationId]);
+
+        if (categoryRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Category not found in this location' });
+        }
+
+        if (!categoryRes.rows[0].is_active) {
+            return res.status(409).json({ error: 'Category is inactive' });
+        }
+
+        let is_public = false;
+        if (visibility === 'PUBLIC') is_public = true;
+        else if (visibility === 'PRIVATE' || visibility === undefined || visibility === null) is_public = false;
+        else {
+            return res.status(400).json({ error: 'visibility must be PUBLIC or PRIVATE' });
+        }
+
+        const insertQuery = `
+            INSERT INTO service_requests (
+                location_id, requester_id, category_id, request_text,
+                title, description, note,
+                is_public, status, expires_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'OPEN', NOW() + INTERVAL '24 hours')
+            RETURNING id
+        `;
+
+        const result = await query(insertQuery, [
+            locationId,
+            user_id,
+            category_id,
+            description,
+            title,
+            description,
+            note || null,
+            is_public,
+        ]);
+
+        return res.status(201).json({
+            message: 'Request created',
+            request: { id: result.rows[0].id },
+        });
+    } catch (err) {
+        console.error(JSON.stringify({
+            level: 'error',
+            request_id: req.request_id || req.get('X-Request-Id'),
+            method: req.method,
+            path: req.originalUrl,
+            user_id: req.user?.user_id,
+            location_id: req.locationId,
+            reason: 'SERVICE_REQUEST_CREATE_ERROR',
+            error_message: err.message,
+        }));
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 exports.createTypeARequest = async (req, res) => {
     try {
         const { category_id, request_text, title, description, note } = req.body;

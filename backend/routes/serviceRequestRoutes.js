@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const serviceRequestController = require('../controllers/serviceRequestController');
 const serviceOfferController = require('../controllers/serviceOfferController');
+const authMiddleware = require('../middlewares/authMiddleware');
 const requireRole = require('../middlewares/roleMiddleware');
 const ROLES = require('../utils/roles');
 
@@ -87,6 +88,9 @@ router.post('/request/type-a', requireRole(ROLES.USER, ROLES.BUSINESS), serviceR
  *         $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/request/type-b', requireRole(ROLES.USER, ROLES.BUSINESS), serviceRequestController.createTypeBRequest);
+
+// Safe alias for mobile clients expecting POST /api/services/requests
+router.post('/requests', authMiddleware, requireRole(ROLES.USER, ROLES.BUSINESS), serviceRequestController.createRequest);
 
 /**
  * @swagger
