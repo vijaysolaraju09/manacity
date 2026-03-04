@@ -3,6 +3,7 @@ const router = express.Router();
 const authMiddleware = require('../middlewares/authMiddleware');
 const homeController = require('../controllers/mobile/homeController');
 const userController = require('../controllers/mobile/userController');
+const searchController = require('../controllers/mobile/searchController');
 
 // Note: authMiddleware and locationMiddleware are applied globally in server.js
 // so this endpoint is already protected and scoped to a location.
@@ -38,6 +39,7 @@ const userController = require('../controllers/mobile/userController');
  *         $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/home', homeController.getHomeData);
+router.get('/search', authMiddleware, searchController.search);
 router.get('/me', authMiddleware, userController.getMobileMe);
 router.put('/me', authMiddleware, userController.updateMobileMe);
 
