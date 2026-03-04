@@ -39,5 +39,6 @@ const userController = require('../controllers/mobile/userController');
  */
 router.get('/home', homeController.getHomeData);
 router.get('/me', authMiddleware, userController.getMobileMe);
+router.put('/me', authMiddleware, userController.updateMobileMe);
 
 module.exports = router;

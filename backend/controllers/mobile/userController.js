@@ -2,6 +2,7 @@ const { query } = require('../../config/db');
 const { createError } = require('../../utils/errors');
 
 const resolveAuthenticatedUserId = (req) => req.user?.user_id || req.user?.id || req.user?.userId || null;
+const safeTrim = (value) => (typeof value === 'string' ? value.trim() : '');
 
 exports.getMobileMe = async (req, res, next) => {
   try {
@@ -51,6 +52,89 @@ exports.getMobileMe = async (req, res, next) => {
     });
   } catch (err) {
     console.error('Get mobile me error:', err);
+    return next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
+  }
+};
+
+exports.updateMobileMe = async (req, res, next) => {
+  try {
+    const userId = resolveAuthenticatedUserId(req);
+    const locationIdFromHeader = req.locationId || null;
+
+    if (!userId) {
+      return next(createError(401, 'AUTH_INVALID_TOKEN', 'User identity missing in token'));
+    }
+
+    const name = safeTrim(req.body?.name);
+    const locationId = req.body?.location_id ? String(req.body.location_id).trim() : '';
+
+    if (!name && !locationId) {
+      return next(createError(400, 'PROFILE_UPDATE_EMPTY', 'No fields to update'));
+    }
+
+    if (name && (name.length < 2 || name.length > 50)) {
+      return next(createError(400, 'PROFILE_NAME_INVALID', 'Name must be 2 to 50 chars'));
+    }
+
+    if (locationId) {
+      const locRes = await query(
+        'SELECT id FROM locations WHERE id = $1 AND is_active = true LIMIT 1',
+        [locationId]
+      );
+
+      if (!locRes.rows.length) {
+        return next(createError(400, 'LOCATION_INVALID', 'Invalid or inactive location'));
+      }
+    }
+
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    if (name) {
+      fields.push(`name = $${idx++}`);
+      values.push(name);
+    }
+
+    if (locationId) {
+      fields.push(`location_id = $${idx++}`);
+      values.push(locationId);
+    }
+
+    values.push(userId);
+
+    const sql = `
+      UPDATE users
+      SET ${fields.join(', ')}, updated_at = NOW()
+      WHERE id = $${idx}
+      RETURNING id, name, phone, role, location_id
+    `;
+
+    const updated = await query(sql, values);
+
+    if (!updated.rows.length) {
+      return next(createError(404, 'USER_NOT_FOUND', 'User not found'));
+    }
+
+    const me = updated.rows[0];
+    const resolvedLocationId = me.location_id || locationIdFromHeader;
+
+    const loc = resolvedLocationId
+      ? await query('SELECT id, name FROM locations WHERE id = $1 LIMIT 1', [resolvedLocationId])
+      : { rows: [] };
+
+    return res.status(200).json({
+      id: me.id,
+      name: me.name,
+      phone: me.phone,
+      role: me.role,
+      location: {
+        id: resolvedLocationId || null,
+        name: loc.rows[0]?.name || null,
+      },
+    });
+  } catch (err) {
+    console.error('Update mobile me error:', err);
     return next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
