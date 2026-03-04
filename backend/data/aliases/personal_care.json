@@ -1,0 +1,13 @@
+{
+  "soap": ["soap","sabbu","sabun"],
+  "shampoo": ["shampoo","hair shampoo"],
+  "hair oil": ["hair oil","coconut hair oil","kesh tel"],
+  "toothpaste": ["toothpaste","paste","colgate","pepsodent"],
+  "toothbrush": ["toothbrush","brush"],
+  "face wash": ["face wash","facewash"],
+  "cream": ["cream","face cream"],
+  "deodorant": ["deodorant","deo","perfume"],
+  "sanitary pads": ["sanitary pads","pads","whisper","stayfree"],
+  "tissues": ["tissues","tissue paper","napkins"],
+  "shaving": ["shaving cream","razor","blade"]
+}

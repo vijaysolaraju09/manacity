@@ -1,0 +1,12 @@
+{
+  "pen": ["pen","pens","ball pen","gel pen"],
+  "pencil": ["pencil","pencils"],
+  "notebook": ["notebook","book","notes book","rough book"],
+  "eraser": ["eraser","rubber"],
+  "sharpener": ["sharpener"],
+  "marker": ["marker","sketch pen"],
+  "glue": ["glue","fevicol","gum"],
+  "tape": ["tape","cellotape","cello tape"],
+  "stapler": ["stapler","pin"],
+  "paper": ["paper","a4 paper","xerox paper","print paper"]
+}

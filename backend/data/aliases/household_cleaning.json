@@ -1,0 +1,15 @@
+{
+  "detergent": ["detergent","washing powder","surf","tide","ariel"],
+  "dishwash": ["dishwash","vim","dish wash"],
+  "floor cleaner": ["floor cleaner","phenyl","lizol"],
+  "toilet cleaner": ["toilet cleaner","harpic"],
+  "handwash": ["handwash","hand wash"],
+  "sanitizer": ["sanitizer","hand sanitizer"],
+  "mop": ["mop","mopping stick"],
+  "broom": ["broom","cheepuru","jhadu"],
+  "bucket": ["bucket","water bucket"],
+  "mug": ["mug","bath mug"],
+  "dustbin": ["dustbin","trash bin"],
+  "matchbox": ["matchbox","matches"],
+  "agarbatti": ["agarbatti","incense sticks","dhoop"]
+}

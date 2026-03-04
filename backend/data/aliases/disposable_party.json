@@ -1,0 +1,9 @@
+{
+  "paper plates": ["paper plates","plates","disposable plates"],
+  "paper cups": ["paper cups","cups","disposable cups"],
+  "spoons": ["spoons","plastic spoons"],
+  "carry bags": ["carry bags","covers","plastic covers"],
+  "foil": ["foil","aluminium foil"],
+  "cling film": ["cling film","food wrap"],
+  "thermocol": ["thermocol","foam sheet"]
+}

@@ -1,0 +1,29 @@
+{
+  "turmeric powder": ["turmeric","pasupu","haldi","turmeric powder"],
+  "red chilli powder": ["red chilli powder","mirchi powder","karam","lal mirch powder"],
+  "coriander powder": ["coriander powder","dhania powder","dhaniya powder"],
+  "cumin": ["cumin","jeera","jeelakarra"],
+  "mustard seeds": ["mustard","mustard seeds","avalu","rai"],
+  "black pepper": ["pepper","black pepper","miriyalu","kali mirch"],
+  "cardamom": ["cardamom","elaichi","elakulu"],
+  "cloves": ["cloves","lavang","lavangalu"],
+  "cinnamon": ["cinnamon","dalchini","cinnamon sticks"],
+  "bay leaf": ["bay leaf","tej patta"],
+  "fennel": ["fennel","saunf","sompu"],
+  "fenugreek seeds": ["fenugreek","methi dana","menthulu"],
+  "asafoetida": ["hing","asafoetida","inguva"],
+
+  "garam masala": ["garam masala","masala powder"],
+  "sambar powder": ["sambar powder","sambar podi"],
+  "rasam powder": ["rasam powder","rasam podi"],
+  "biryani masala": ["biryani masala","biriyani masala"],
+  "chicken masala": ["chicken masala","kodi masala"],
+  "mutton masala": ["mutton masala"],
+  "fish masala": ["fish masala"],
+
+  "salt pepper": ["salt pepper","salt & pepper"],
+  "chat masala": ["chat masala","chaat masala"],
+  "amchur": ["amchur","mango powder"],
+  "baking soda": ["baking soda","soda","meetha soda"],
+  "baking powder": ["baking powder"]
+}

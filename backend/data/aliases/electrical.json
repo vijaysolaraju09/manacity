@@ -1,0 +1,17 @@
+{
+  "bulb": ["bulb","light bulb","led bulb","bulb light"],
+  "tube light": ["tube light","tubelight","led tube"],
+  "led light": ["led light","led panel","led"],
+  "switch": ["switch","switches","switch board","switchboard"],
+  "socket": ["socket","plug point","holder"],
+  "plug": ["plug","3 pin plug","top"],
+  "wire": ["wire","wires","cable","electric wire","copper wire"],
+  "extension box": ["extension box","extension","spike guard","extension board"],
+  "fan": ["fan","ceiling fan","table fan"],
+  "motor": ["motor","water motor","pump motor"],
+  "inverter": ["inverter","ups"],
+  "battery": ["battery","inverter battery"],
+  "charger": ["charger","mobile charger","adapter"],
+  "torch": ["torch","flashlight","torch light"],
+  "battery cells": ["battery cells","aa battery","aaa battery"]
+}

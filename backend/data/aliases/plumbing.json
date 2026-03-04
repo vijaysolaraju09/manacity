@@ -1,0 +1,12 @@
+{
+  "pipe": ["pipe","pipes","water pipe","pvc pipe","plumbing pipe"],
+  "pvc pipe": ["pvc pipe","pvc"],
+  "tap": ["tap","water tap","bib cock","nalla","nal"],
+  "shower": ["shower","shower head"],
+  "valve": ["valve","stop valve","ball valve"],
+  "hose pipe": ["hose pipe","water hose","pipe hose"],
+  "sink": ["sink","wash basin","basin"],
+  "toilet": ["toilet","commode","western toilet"],
+  "flush": ["flush","flush tank","flush button"],
+  "thread tape": ["thread tape","teflon tape","ptfe tape"]
+}
