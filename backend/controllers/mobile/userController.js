@@ -194,7 +194,16 @@ exports.resetMobilePassword = async (req, res, next) => {
 
     return res.status(200).json({ message: 'Password updated successfully' });
   } catch (err) {
-    console.error('Reset mobile password error:', err);
-    return next(createError(500, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
+    console.error('Reset mobile password error:', {
+      request_id: req.request_id,
+      route: req.originalUrl,
+      user_id: req.user?.user_id || req.user?.id,
+      code: err?.code,
+      message: err?.message,
+    });
+    if (err?.status && err?.code && err?.message) {
+      return next(err);
+    }
+    return next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
