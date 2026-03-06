@@ -360,7 +360,15 @@ const sendForgotPasswordOtp = async (req, res, next) => {
 
     return res.status(200).json({ message: 'If an account exists, OTP sent successfully' });
   } catch (err) {
-    console.error('Forgot password send OTP error:', err.message);
+    console.error('Forgot password send OTP error:', {
+      request_id: req.request_id,
+      route: req.originalUrl,
+      code: err?.code,
+      message: err?.message,
+    });
+    if (err?.status && err?.code && err?.message) {
+      return next(err);
+    }
     return next(createError(500, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
   }
 };
@@ -422,7 +430,15 @@ const verifyForgotPasswordOtp = async (req, res, next) => {
 
     return res.status(200).json({ message: 'OTP verified', verified: true, reset_token: resetToken });
   } catch (err) {
-    console.error('Forgot password verify OTP error:', err.message);
+    console.error('Forgot password verify OTP error:', {
+      request_id: req.request_id,
+      route: req.originalUrl,
+      code: err?.code,
+      message: err?.message,
+    });
+    if (err?.status && err?.code && err?.message) {
+      return next(err);
+    }
     return next(createError(500, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
   }
 };
@@ -499,7 +515,15 @@ const resetForgotPassword = async (req, res, next) => {
 
     return res.status(200).json({ message: 'Password updated successfully' });
   } catch (err) {
-    console.error('Forgot password reset error:', err.message);
+    console.error('Forgot password reset error:', {
+      request_id: req.request_id,
+      route: req.originalUrl,
+      code: err?.code,
+      message: err?.message,
+    });
+    if (err?.status && err?.code && err?.message) {
+      return next(err);
+    }
     return next(createError(500, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
   }
 };
@@ -594,14 +618,17 @@ const login = async (req, res, next) => {
   try {
     const { phone, password } = req.body;
 
-    const normalizedPhone = normalizePhone(phone);
-
     // 1. Validation
-    if (!normalizedPhone) {
-      return next(createError(400, 'PHONE_INVALID', 'Invalid phone number'));
+    if (!phone) {
+      return next(createError(400, 'PHONE_REQUIRED', 'Phone number is required'));
     }
     if (!password) {
-      return next(createError(400, 'PASSWORD_REQUIRED', 'Phone and password are required'));
+      return next(createError(400, 'PASSWORD_REQUIRED', 'Password is required'));
+    }
+
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone) {
+      return next(createError(400, 'PHONE_INVALID', 'Invalid phone number'));
     }
 
     // 2. Fetch User
@@ -614,15 +641,15 @@ const login = async (req, res, next) => {
     const user = rows[0];
 
     if (!user) {
-      return next(createError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid credentials'));
+      return next(createError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid phone number or password'));
     }
 
     if (user.is_active === false || user.deleted_at) {
-      return next(createError(403, 'USER_INACTIVE', 'User is inactive'));
+      return next(createError(403, 'USER_INACTIVE', 'Your account is inactive'));
     }
 
     if (!user.password_hash) {
-      return next(createError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid credentials'));
+      return next(createError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid phone number or password'));
     }
 
     let isMatch = false;
@@ -630,11 +657,11 @@ const login = async (req, res, next) => {
       isMatch = await comparePassword(password, user.password_hash);
     } catch (compareErr) {
       console.error('Login password compare failed:', compareErr);
-      return next(createError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid credentials'));
+      return next(createError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid phone number or password'));
     }
 
     if (!isMatch) {
-      return next(createError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid credentials'));
+      return next(createError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid phone number or password'));
     }
 
     // 4. Generate JWT
@@ -657,8 +684,16 @@ const login = async (req, res, next) => {
       }
     });
   } catch (err) {
-    console.error('Login Error:', err);
-    next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
+    console.error('Login Error:', {
+      request_id: req.request_id,
+      route: req.originalUrl,
+      code: err?.code,
+      message: err?.message,
+    });
+    if (err?.status && err?.code && err?.message) {
+      return next(err);
+    }
+    return next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
 
