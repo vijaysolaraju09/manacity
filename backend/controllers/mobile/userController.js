@@ -141,7 +141,7 @@ exports.updateMobileMe = async (req, res, next) => {
 };
 
 
-exports.resetMobilePassword = async (req, res, next) => {
+exports.resetPassword = async (req, res, next) => {
   try {
     const userId = resolveAuthenticatedUserId(req);
 
@@ -198,3 +198,6 @@ exports.resetMobilePassword = async (req, res, next) => {
     return next(createError(500, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
   }
 };
+
+// Backward-compatible alias for any existing imports
+exports.resetMobilePassword = exports.resetPassword;
