@@ -1,6 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { sendOtp, verifyOtp, register, login } = require('../controllers/authController');
+const {
+  sendOtp,
+  verifyOtp,
+  register,
+  login,
+  sendForgotPasswordOtp,
+  verifyForgotPasswordOtp,
+  resetForgotPassword,
+} = require('../controllers/authController');
 
 /**
  * @swagger
@@ -60,5 +68,9 @@ router.post('/register', register);
 // OTP/Firebase is used ONLY for registration and password reset flows.
 // Do NOT add Firebase middleware here.
 router.post('/login', login);
+
+router.post('/forgot-password/send-otp', sendForgotPasswordOtp);
+router.post('/forgot-password/verify-otp', verifyForgotPasswordOtp);
+router.post('/forgot-password/reset', resetForgotPassword);
 
 module.exports = router;

@@ -44,5 +44,6 @@ router.get('/search', authMiddleware, searchController.search);
 router.get('/me', authMiddleware, userController.getMobileMe);
 router.put('/me', authMiddleware, userController.updateMobileMe);
 router.post('/quick-order', authMiddleware, quickOrderController.createQuickOrder);
+router.post('/me/reset-password', authMiddleware, userController.resetMobilePassword);
 
 module.exports = router;

@@ -46,6 +46,21 @@ const hashOtp = (otp) => crypto
   .update(`${otp}${getOtpPepper()}`)
   .digest('hex');
 
+const hashResetSessionToken = (token) => crypto
+  .createHash('sha256')
+  .update(`${token}${getOtpPepper()}`)
+  .digest('hex');
+
+const logAuthFlow = (req, flow, extras = {}) => {
+  console.log(JSON.stringify({
+    level: 'info',
+    request_id: req.request_id,
+    user_id: req.user?.user_id || req.user?.id,
+    flow,
+    ...extras,
+  }));
+};
+
 const requestPromise = ({ hostname, path, method, headers, body }) => new Promise((resolve, reject) => {
   const req = https.request(
     {
@@ -282,6 +297,204 @@ const verifyOtp = async (req, res) => {
   }
 };
 
+const sendForgotPasswordOtp = async (req, res, next) => {
+  try {
+    const normalizedPhone = normalizePhone(req.body?.phone);
+
+    if (!req.body?.phone) {
+      return next(createError(400, 'PHONE_REQUIRED', 'Phone number is required'));
+    }
+
+    if (!normalizedPhone) {
+      return next(createError(400, 'PHONE_INVALID', 'Invalid phone number'));
+    }
+
+    const userRes = await query(
+      'SELECT id FROM users WHERE phone = $1 AND deleted_at IS NULL AND is_active = true LIMIT 1',
+      [normalizedPhone]
+    );
+
+    if (!userRes.rows.length) {
+      logAuthFlow(req, 'forgot_password_send_otp', {
+        phone_masked: maskPhoneForLogs(normalizedPhone),
+        outcome: 'accepted_no_user',
+      });
+      return res.status(200).json({ message: 'If an account exists, OTP sent successfully' });
+    }
+
+    const rateLimitRes = await query(
+      `SELECT COUNT(*) AS count
+       FROM otp_codes
+       WHERE phone = $1 AND created_at > NOW() - INTERVAL '1 hour'`,
+      [normalizedPhone]
+    );
+    const otpCount = Number.parseInt(rateLimitRes.rows[0]?.count || '0', 10);
+    if (otpCount >= 3) {
+      return next(createError(429, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
+    }
+
+    const otp = generateOtp();
+    const otpHash = hashOtp(otp);
+    const message = `Your Manacity OTP is ${otp}. Valid for 5 minutes.`;
+
+    const insertRes = await query(
+      `INSERT INTO otp_codes (phone, otp, expires_at)
+       VALUES ($1, $2, NOW() + INTERVAL '5 minutes')
+       RETURNING id`,
+      [normalizedPhone, otpHash]
+    );
+
+    try {
+      await sendSms(normalizedPhone, message);
+    } catch (smsErr) {
+      if (insertRes.rows[0]?.id) {
+        await query('DELETE FROM otp_codes WHERE id = $1', [insertRes.rows[0].id]);
+      }
+      return next(createError(500, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
+    }
+
+    logAuthFlow(req, 'forgot_password_send_otp', {
+      phone_masked: maskPhoneForLogs(normalizedPhone),
+      outcome: 'otp_sent',
+    });
+
+    return res.status(200).json({ message: 'If an account exists, OTP sent successfully' });
+  } catch (err) {
+    console.error('Forgot password send OTP error:', err.message);
+    return next(createError(500, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
+  }
+};
+
+const verifyForgotPasswordOtp = async (req, res, next) => {
+  try {
+    const normalizedPhone = normalizePhone(req.body?.phone);
+    const otp = typeof req.body?.otp === 'string' ? req.body.otp.trim() : req.body?.otp;
+
+    if (!req.body?.phone) {
+      return next(createError(400, 'PHONE_REQUIRED', 'Phone number is required'));
+    }
+    if (!normalizedPhone) {
+      return next(createError(400, 'PHONE_INVALID', 'Invalid phone number'));
+    }
+    if (!otp) {
+      return next(createError(400, 'OTP_REQUIRED', 'OTP is required'));
+    }
+    if (!/^\d{6}$/.test(String(otp))) {
+      return next(createError(400, 'OTP_INVALID', 'Invalid or expired OTP'));
+    }
+
+    const { rows } = await query(
+      `SELECT id, otp, attempts
+       FROM otp_codes
+       WHERE phone = $1 AND expires_at > NOW()
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [normalizedPhone]
+    );
+
+    if (!rows.length) {
+      return next(createError(400, 'OTP_INVALID', 'Invalid or expired OTP'));
+    }
+
+    const record = rows[0];
+    if (record.attempts >= 5) {
+      return next(createError(400, 'OTP_INVALID', 'Invalid or expired OTP'));
+    }
+
+    const otpHash = hashOtp(otp);
+    if (record.otp !== otpHash) {
+      await query('UPDATE otp_codes SET attempts = attempts + 1 WHERE id = $1', [record.id]);
+      return next(createError(400, 'OTP_INVALID', 'Invalid or expired OTP'));
+    }
+
+    const resetToken = crypto.randomBytes(24).toString('hex');
+    await query(
+      `UPDATE otp_codes
+       SET otp = $1, attempts = 998, expires_at = NOW() + INTERVAL '10 minutes'
+       WHERE id = $2`,
+      [hashResetSessionToken(resetToken), record.id]
+    );
+
+    logAuthFlow(req, 'forgot_password_verify_otp', {
+      phone_masked: maskPhoneForLogs(normalizedPhone),
+      outcome: 'verified',
+    });
+
+    return res.status(200).json({ message: 'OTP verified', reset_token: resetToken });
+  } catch (err) {
+    console.error('Forgot password verify OTP error:', err.message);
+    return next(createError(500, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
+  }
+};
+
+const resetForgotPassword = async (req, res, next) => {
+  try {
+    const normalizedPhone = normalizePhone(req.body?.phone);
+    const newPassword = req.body?.new_password;
+    const resetToken = typeof req.body?.reset_token === 'string' ? req.body.reset_token.trim() : '';
+
+    if (!req.body?.phone) {
+      return next(createError(400, 'PHONE_REQUIRED', 'Phone number is required'));
+    }
+    if (!normalizedPhone) {
+      return next(createError(400, 'PHONE_INVALID', 'Invalid phone number'));
+    }
+    if (!newPassword || typeof newPassword !== 'string') {
+      return next(createError(400, 'PASSWORD_REQUIRED', 'Password is required'));
+    }
+    if (newPassword.length < 8) {
+      return next(createError(400, 'PASSWORD_TOO_SHORT', 'Password must be at least 8 characters'));
+    }
+    if (!resetToken) {
+      return next(createError(400, 'OTP_INVALID', 'Invalid or expired OTP'));
+    }
+
+    const { rows } = await query(
+      `SELECT id
+       FROM otp_codes
+       WHERE phone = $1
+         AND otp = $2
+         AND attempts = 998
+         AND expires_at > NOW()
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [normalizedPhone, hashResetSessionToken(resetToken)]
+    );
+
+    if (!rows.length) {
+      return next(createError(400, 'OTP_INVALID', 'Invalid or expired OTP'));
+    }
+
+    const userRes = await query(
+      'SELECT id, password_hash FROM users WHERE phone = $1 AND deleted_at IS NULL LIMIT 1',
+      [normalizedPhone]
+    );
+
+    if (!userRes.rows.length) {
+      return next(createError(400, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
+    }
+
+    const hashedPassword = await hashPassword(newPassword);
+
+    await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [
+      hashedPassword,
+      userRes.rows[0].id,
+    ]);
+
+    await query('DELETE FROM otp_codes WHERE id = $1', [rows[0].id]);
+
+    logAuthFlow(req, 'forgot_password_reset', {
+      phone_masked: maskPhoneForLogs(normalizedPhone),
+      outcome: 'password_updated',
+    });
+
+    return res.status(200).json({ message: 'Password updated successfully' });
+  } catch (err) {
+    console.error('Forgot password reset error:', err.message);
+    return next(createError(500, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
+  }
+};
+
 const register = async (req, res) => {
   try {
     const { phone, password, location_id, name } = req.body;
@@ -440,4 +653,13 @@ const login = async (req, res, next) => {
   }
 };
 
-module.exports = { sendOtp, verifyOtp, register, login };
+module.exports = {
+  sendOtp,
+  verifyOtp,
+  register,
+  login,
+  sendForgotPasswordOtp,
+  verifyForgotPasswordOtp,
+  resetForgotPassword,
+  normalizePhone,
+};
