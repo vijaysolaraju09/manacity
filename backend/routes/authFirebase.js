@@ -189,7 +189,7 @@ router.post('/reset-password', verifyFirebaseToken, async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    await query('UPDATE users SET password = $1 WHERE phone = $2', [hashedPassword, phone_number]);
+    await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE phone = $2', [hashedPassword, phone_number]);
 
     res.json({ message: 'Password updated successfully' });
   } catch (error) {

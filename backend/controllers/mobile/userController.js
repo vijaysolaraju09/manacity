@@ -1,5 +1,6 @@
 const { query } = require('../../config/db');
 const { createError } = require('../../utils/errors');
+const { hashPassword, comparePassword } = require('../../utils/password');
 
 const resolveAuthenticatedUserId = (req) => req.user?.user_id || req.user?.id || req.user?.userId || null;
 const safeTrim = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -136,5 +137,64 @@ exports.updateMobileMe = async (req, res, next) => {
   } catch (err) {
     console.error('Update mobile me error:', err);
     return next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
+  }
+};
+
+
+exports.resetMobilePassword = async (req, res, next) => {
+  try {
+    const userId = resolveAuthenticatedUserId(req);
+
+    if (!userId) {
+      return next(createError(401, 'AUTH_INVALID_TOKEN', 'Authentication required'));
+    }
+
+    const currentPassword = req.body?.current_password;
+    const newPassword = req.body?.new_password;
+
+    if (!currentPassword || typeof currentPassword !== 'string') {
+      return next(createError(400, 'CURRENT_PASSWORD_REQUIRED', 'Current password is required'));
+    }
+
+    if (!newPassword || typeof newPassword !== 'string') {
+      return next(createError(400, 'PASSWORD_REQUIRED', 'Password is required'));
+    }
+
+    if (newPassword.length < 8) {
+      return next(createError(400, 'PASSWORD_TOO_SHORT', 'Password must be at least 8 characters'));
+    }
+
+    const userRes = await query('SELECT id, password_hash FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1', [userId]);
+    const user = userRes.rows[0];
+
+    if (!user || !user.password_hash) {
+      return next(createError(400, 'CURRENT_PASSWORD_INCORRECT', 'Current password is incorrect'));
+    }
+
+    const currentMatches = await comparePassword(currentPassword, user.password_hash).catch(() => false);
+    if (!currentMatches) {
+      return next(createError(400, 'CURRENT_PASSWORD_INCORRECT', 'Current password is incorrect'));
+    }
+
+    const newMatchesOld = await comparePassword(newPassword, user.password_hash).catch(() => false);
+    if (newMatchesOld) {
+      return next(createError(400, 'NEW_PASSWORD_SAME_AS_OLD', 'New password must be different from current password'));
+    }
+
+    const hashedNewPassword = await hashPassword(newPassword);
+    await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [hashedNewPassword, user.id]);
+
+    console.log(JSON.stringify({
+      level: 'info',
+      request_id: req.request_id,
+      user_id: userId,
+      flow: 'profile_reset_password',
+      outcome: 'password_updated',
+    }));
+
+    return res.status(200).json({ message: 'Password updated successfully' });
+  } catch (err) {
+    console.error('Reset mobile password error:', err);
+    return next(createError(500, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
   }
 };
