@@ -420,7 +420,7 @@ const verifyForgotPasswordOtp = async (req, res, next) => {
       outcome: 'verified',
     });
 
-    return res.status(200).json({ message: 'OTP verified', reset_token: resetToken });
+    return res.status(200).json({ message: 'OTP verified', verified: true, reset_token: resetToken });
   } catch (err) {
     console.error('Forgot password verify OTP error:', err.message);
     return next(createError(500, 'RESET_UNABLE_TO_PROCESS', 'Unable to process request'));
@@ -431,7 +431,8 @@ const resetForgotPassword = async (req, res, next) => {
   try {
     const normalizedPhone = normalizePhone(req.body?.phone);
     const newPassword = req.body?.new_password;
-    const resetToken = typeof req.body?.reset_token === 'string' ? req.body.reset_token.trim() : '';
+    const requestedResetToken = req.body?.reset_token ?? req.body?.resetToken;
+    const resetToken = typeof requestedResetToken === 'string' ? requestedResetToken.trim() : '';
 
     if (!req.body?.phone) {
       return next(createError(400, 'PHONE_REQUIRED', 'Phone number is required'));
@@ -446,6 +447,10 @@ const resetForgotPassword = async (req, res, next) => {
       return next(createError(400, 'PASSWORD_TOO_SHORT', 'Password must be at least 8 characters'));
     }
     if (!resetToken) {
+      logAuthFlow(req, 'forgot_password_reset', {
+        phone_masked: maskPhoneForLogs(normalizedPhone),
+        outcome: 'missing_reset_token',
+      });
       return next(createError(400, 'OTP_INVALID', 'Invalid or expired OTP'));
     }
 
@@ -462,6 +467,10 @@ const resetForgotPassword = async (req, res, next) => {
     );
 
     if (!rows.length) {
+      logAuthFlow(req, 'forgot_password_reset', {
+        phone_masked: maskPhoneForLogs(normalizedPhone),
+        outcome: 'invalid_reset_token',
+      });
       return next(createError(400, 'OTP_INVALID', 'Invalid or expired OTP'));
     }
 
