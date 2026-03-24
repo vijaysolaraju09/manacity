@@ -1,20 +1,94 @@
 {
-  "chips": ["chips","lays","kurkure","chips packet"],
-  "mixture": ["mixture","namkeen","mixchar","mixtur"],
-  "murukulu": ["murukulu","janthikalu","chakli"],
-  "boondi": ["boondi","boondhi"],
-  "sev": ["sev","omapodi"],
-  "samosa": ["samosa","samosalu"],
-  "puffs": ["puffs","veg puff","egg puff","chicken puff"],
-  "biscuits": ["biscuits","cookies"],
-
-  "cool drinks": ["cool drinks","soft drinks","cooldrink","thums up","coke","pepsi","sprite"],
-  "water bottle": ["water bottle","bottled water","mineral water"],
-  "juice": ["juice","fruit juice"],
-  "buttermilk": ["buttermilk","majiga"],
-  "lassi": ["lassi"],
-  "energy drink": ["energy drink","sting","red bull"],
-
-  "tea": ["tea","chai"],
-  "coffee": ["coffee","kaapi"]
+  "chips": [
+    "chips",
+    "lays",
+    "kurkure",
+    "chips packet",
+    "wafers",
+    "aloo chips"
+  ],
+  "mixture": [
+    "mixture",
+    "namkeen",
+    "mixchar",
+    "mixtur",
+    "mixure",
+    "mixture packet"
+  ],
+  "murukulu": [
+    "murukulu",
+    "janthikalu",
+    "chakli",
+    "jantikalu",
+    "chegodilu"
+  ],
+  "boondi": [
+    "boondi",
+    "boondhi"
+  ],
+  "sev": [
+    "sev",
+    "omapodi"
+  ],
+  "samosa": [
+    "samosa",
+    "samosalu"
+  ],
+  "puffs": [
+    "puffs",
+    "veg puff",
+    "egg puff",
+    "chicken puff"
+  ],
+  "biscuits": [
+    "biscuits",
+    "cookies",
+    "bisket",
+    "britannia biscuit",
+    "parle g"
+  ],
+  "cool drinks": [
+    "cool drinks",
+    "soft drinks",
+    "cooldrink",
+    "thums up",
+    "coke",
+    "pepsi",
+    "sprite",
+    "cooldrink bottle",
+    "soda"
+  ],
+  "water bottle": [
+    "water bottle",
+    "bottled water",
+    "mineral water"
+  ],
+  "juice": [
+    "juice",
+    "fruit juice"
+  ],
+  "buttermilk": [
+    "buttermilk",
+    "majiga",
+    "majjiga",
+    "chaas"
+  ],
+  "lassi": [
+    "lassi"
+  ],
+  "energy drink": [
+    "energy drink",
+    "sting",
+    "red bull"
+  ],
+  "tea": [
+    "tea",
+    "chai",
+    "tea packet"
+  ],
+  "coffee": [
+    "coffee",
+    "kaapi",
+    "coffee sachet"
+  ]
 }

@@ -1,43 +1,276 @@
 {
-  "onion": ["onion","onions","ulli","ulli payalu","ullipayalu","ulli gadda","ulligadda","ulligaddalu","erra gadda","erragadda","erragaddalu"],
-  "tomato": ["tomato","tomatoes","tamata","tamota","tamotaalu","tamatalu"],
-  "potato": ["potato","potatoes","aloo","bangala dumpa","bangaladumpa","bangaladumpalu","dumpa","dumpalu"],
-  "green chilli": ["green chilli","green chilies","pachi mirchi","pachimirchi","mirchi","mirapakay","mirapakayalu","hari mirch"],
-  "red chilli": ["red chilli","dry chilli","endumirchi","endu mirchi","lal mirch","red chilies"],
-  "garlic": ["garlic","vellulli","velulli","velluli","vellulli paya","vellullipaya","lasun"],
-  "ginger": ["ginger","allam","allaam","adrak"],
-  "coriander leaves": ["coriander","coriander leaves","kottimeera","kothimeera","kottimira","kothimira","dhania"],
-  "mint leaves": ["mint","pudina","pudina leaves"],
-  "curry leaves": ["curry leaves","karivepaku","karivepakulu","kari vepaku"],
-  "spinach": ["spinach","palak","palakura","palak kura"],
-  "amaranth leaves": ["amaranth","thotakura","thota kura"],
-  "fenugreek leaves": ["fenugreek leaves","methi","menthikura","menthi kura"],
-  "gongura": ["gongura","gongura kura","pulicha keerai"],
-  "brinjal": ["brinjal","brinjals","eggplant","eggplants","vankaya","vankayalu"],
-  "okra": ["okra","lady finger","ladies finger","bendakaya","bendakayalu","bhindi"],
-  "cucumber": ["cucumber","dosakaya","kheera","kakdi"],
-  "carrot": ["carrot","gajar"],
-  "beetroot": ["beetroot","beet root","beet"],
-  "radish": ["radish","mullangi","mulli","mooli"],
-  "cabbage": ["cabbage"],
-  "cauliflower": ["cauliflower","gobi","phool gobi"],
-  "capsicum": ["capsicum","bell pepper","simla mirch","shimla mirch"],
-  "drumstick": ["drumstick","munagakaya","moringa","munaga"],
-  "bottle gourd": ["bottle gourd","sorakaya","lauki","doodhi"],
-  "ridge gourd": ["ridge gourd","beerakaya","turai"],
-  "snake gourd": ["snake gourd","potlakaya","padwal"],
-  "bitter gourd": ["bitter gourd","kakara kaya","kakarakaya","karela"],
-  "pumpkin": ["pumpkin","gummadikaya","kaddu"],
-  "ash gourd": ["ash gourd","boodida gummadikaya","winter melon"],
-  "sweet potato": ["sweet potato","chilakada dumpa","shakarkandi"],
-  "yam": ["yam","kanda","suran","kandha"],
-  "mushroom": ["mushroom","mushrooms"],
-  "green peas": ["green peas","peas","batani","matar"],
-  "sweet corn": ["sweet corn","corn","makka","bhutta"],
-  "beans": ["beans","green beans","beans kura"],
-  "cluster beans": ["cluster beans","goruchikkudu","gawar","gawar phali"],
-  "ivy gourd": ["ivy gourd","dondakaya","tindora"],
-  "raw banana": ["raw banana","aratikaya","plantain","kachha kela"],
-  "lemon": ["lemon","nimmakaya","nimmakayalu","nimbu"],
-  "coconut": ["coconut","kobbari kaya","kobbari","narial"]
+  "onion": [
+    "onion",
+    "onions",
+    "ulli",
+    "ulli payalu",
+    "ullipayalu",
+    "ulli gadda",
+    "ulligadda",
+    "ulligaddalu",
+    "erra gadda",
+    "erragadda",
+    "erragaddalu",
+    "erra gaddalu",
+    "eragaddalu",
+    "yerragadda",
+    "yerragaddalu"
+  ],
+  "tomato": [
+    "tomato",
+    "tomatoes",
+    "tamata",
+    "tamota",
+    "tamotaalu",
+    "tamatalu",
+    "tomaato",
+    "thamata"
+  ],
+  "potato": [
+    "potato",
+    "potatoes",
+    "aloo",
+    "bangala dumpa",
+    "bangaladumpa",
+    "bangaladumpalu",
+    "dumpa",
+    "dumpalu",
+    "bangala dumpalu"
+  ],
+  "green chilli": [
+    "green chilli",
+    "green chilies",
+    "pachi mirchi",
+    "pachimirchi",
+    "mirchi",
+    "mirapakay",
+    "mirapakayalu",
+    "hari mirch",
+    "pachi mirapakaya",
+    "pachi mirapakayaalu",
+    "pachhi mirchi"
+  ],
+  "red chilli": [
+    "red chilli",
+    "dry chilli",
+    "endumirchi",
+    "endu mirchi",
+    "lal mirch",
+    "red chilies"
+  ],
+  "garlic": [
+    "garlic",
+    "vellulli",
+    "velulli",
+    "velluli",
+    "vellulli paya",
+    "vellullipaya",
+    "lasun"
+  ],
+  "ginger": [
+    "ginger",
+    "allam",
+    "allaam",
+    "adrak"
+  ],
+  "coriander leaves": [
+    "coriander",
+    "coriander leaves",
+    "kottimeera",
+    "kothimeera",
+    "kottimira",
+    "kothimira",
+    "dhania",
+    "kottimeer",
+    "kothimeer"
+  ],
+  "mint leaves": [
+    "mint",
+    "pudina",
+    "pudina leaves"
+  ],
+  "curry leaves": [
+    "curry leaves",
+    "karivepaku",
+    "karivepakulu",
+    "kari vepaku",
+    "karivepaaku"
+  ],
+  "spinach": [
+    "spinach",
+    "palak",
+    "palakura",
+    "palak kura"
+  ],
+  "amaranth leaves": [
+    "amaranth",
+    "thotakura",
+    "thota kura"
+  ],
+  "fenugreek leaves": [
+    "fenugreek leaves",
+    "methi",
+    "menthikura",
+    "menthi kura"
+  ],
+  "gongura": [
+    "gongura",
+    "gongura kura",
+    "pulicha keerai"
+  ],
+  "brinjal": [
+    "brinjal",
+    "brinjals",
+    "eggplant",
+    "eggplants",
+    "vankaya",
+    "vankayalu",
+    "vankai"
+  ],
+  "okra": [
+    "okra",
+    "lady finger",
+    "ladies finger",
+    "bendakaya",
+    "bendakayalu",
+    "bhindi",
+    "bendakayaalu"
+  ],
+  "cucumber": [
+    "cucumber",
+    "dosakaya",
+    "kheera",
+    "kakdi"
+  ],
+  "carrot": [
+    "carrot",
+    "gajar"
+  ],
+  "beetroot": [
+    "beetroot",
+    "beet root",
+    "beet"
+  ],
+  "radish": [
+    "radish",
+    "mullangi",
+    "mulli",
+    "mooli"
+  ],
+  "cabbage": [
+    "cabbage"
+  ],
+  "cauliflower": [
+    "cauliflower",
+    "gobi",
+    "phool gobi"
+  ],
+  "capsicum": [
+    "capsicum",
+    "bell pepper",
+    "simla mirch",
+    "shimla mirch"
+  ],
+  "drumstick": [
+    "drumstick",
+    "munagakaya",
+    "moringa",
+    "munaga"
+  ],
+  "bottle gourd": [
+    "bottle gourd",
+    "sorakaya",
+    "lauki",
+    "doodhi",
+    "sora kaya"
+  ],
+  "ridge gourd": [
+    "ridge gourd",
+    "beerakaya",
+    "turai",
+    "beera kaya",
+    "peerkangai"
+  ],
+  "snake gourd": [
+    "snake gourd",
+    "potlakaya",
+    "padwal"
+  ],
+  "bitter gourd": [
+    "bitter gourd",
+    "kakara kaya",
+    "kakarakaya",
+    "karela"
+  ],
+  "pumpkin": [
+    "pumpkin",
+    "gummadikaya",
+    "kaddu"
+  ],
+  "ash gourd": [
+    "ash gourd",
+    "boodida gummadikaya",
+    "winter melon"
+  ],
+  "sweet potato": [
+    "sweet potato",
+    "chilakada dumpa",
+    "shakarkandi"
+  ],
+  "yam": [
+    "yam",
+    "kanda",
+    "suran",
+    "kandha"
+  ],
+  "mushroom": [
+    "mushroom",
+    "mushrooms"
+  ],
+  "green peas": [
+    "green peas",
+    "peas",
+    "batani",
+    "matar"
+  ],
+  "sweet corn": [
+    "sweet corn",
+    "corn",
+    "makka",
+    "bhutta"
+  ],
+  "beans": [
+    "beans",
+    "green beans",
+    "beans kura"
+  ],
+  "cluster beans": [
+    "cluster beans",
+    "goruchikkudu",
+    "gawar",
+    "gawar phali"
+  ],
+  "ivy gourd": [
+    "ivy gourd",
+    "dondakaya",
+    "tindora"
+  ],
+  "raw banana": [
+    "raw banana",
+    "aratikaya",
+    "plantain",
+    "kachha kela"
+  ],
+  "lemon": [
+    "lemon",
+    "nimmakaya",
+    "nimmakayalu",
+    "nimbu"
+  ],
+  "coconut": [
+    "coconut",
+    "kobbari kaya",
+    "kobbari",
+    "narial"
+  ]
 }
