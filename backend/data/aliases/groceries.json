@@ -1,247 +1,50 @@
 {
-  "rice": [
-    "rice",
-    "biyyam",
-    "chaaval",
-    "chawal",
-    "sannalu",
-    "rice bag",
-    "sona masoori",
-    "basmati",
-    "jeera rice",
-    "biyyam bag"
-  ],
-  "wheat flour": [
-    "wheat flour",
-    "atta",
-    "aata",
-    "godhuma pindi",
-    "gehun atta",
-    "chapati atta"
-  ],
-  "maida": [
-    "maida",
-    "all purpose flour",
-    "white flour"
-  ],
-  "rava": [
-    "rava",
-    "sooji",
-    "suji",
-    "semolina",
-    "upma rava",
-    "bombay rava"
-  ],
-  "poha": [
-    "poha",
-    "atukulu",
-    "aval",
-    "pohe",
-    "avalakki"
-  ],
-  "vermicelli": [
-    "vermicelli",
-    "semiya",
-    "semai",
-    "semiya noodles"
-  ],
-  "sugar": [
-    "sugar",
-    "chekkera",
-    "shakkar",
-    "chini"
-  ],
-  "salt": [
-    "salt",
-    "uppu",
-    "namak",
-    "iodized salt"
-  ],
-  "jaggery": [
-    "jaggery",
-    "bellam",
-    "gur",
-    "gud",
-    "jaggary",
-    "bellam mukka"
-  ],
-  "toor dal": [
-    "toor dal",
-    "kandi pappu",
-    "arhar dal",
-    "tuvar dal"
-  ],
-  "moong dal": [
-    "moong dal",
-    "pesara pappu",
-    "mung dal",
-    "pesara pappulu"
-  ],
-  "urad dal": [
-    "urad dal",
-    "minapa pappu",
-    "udad dal",
-    "minapa pappulu"
-  ],
-  "chana dal": [
-    "chana dal",
-    "senaga pappu",
-    "bengal gram dal",
-    "senaga pappulu"
-  ],
-  "masoor dal": [
-    "masoor dal",
-    "red lentil",
-    "mosoor dal"
-  ],
-  "black gram": [
-    "black gram",
-    "minumulu",
-    "urad whole"
-  ],
-  "green gram": [
-    "green gram",
-    "pesalu",
-    "moong whole"
-  ],
-  "chickpeas": [
-    "chickpeas",
-    "chana",
-    "senagalu",
-    "kabuli chana",
-    "kala chana"
-  ],
-  "rajma": [
-    "rajma",
-    "kidney beans"
-  ],
-  "tea powder": [
-    "tea",
-    "tea powder",
-    "chai",
-    "chai powder",
-    "tea dust"
-  ],
-  "coffee powder": [
-    "coffee",
-    "coffee powder",
-    "kaapi",
-    "kappi",
-    "bru",
-    "nescafe"
-  ],
-  "sunflower oil": [
-    "sunflower oil",
-    "sunflower",
-    "oil",
-    "nune",
-    "tel",
-    "sun flower oil",
-    "nune packet",
-    "noone"
-  ],
-  "groundnut oil": [
-    "groundnut oil",
-    "peanut oil",
-    "verusenaga nune",
-    "verusenaga noone"
-  ],
-  "coconut oil": [
-    "coconut oil",
-    "kobbari nune",
-    "narial oil"
-  ],
-  "gingelly oil": [
-    "gingelly oil",
-    "sesame oil",
-    "nuvvula nune",
-    "til oil"
-  ],
-  "ghee": [
-    "ghee",
-    "neyyi",
-    "clarified butter",
-    "neyi",
-    "neyyi dabba"
-  ],
-  "bread": [
-    "bread",
-    "double roti",
-    "bun bread"
-  ],
-  "eggs": [
-    "eggs",
-    "egg",
-    "kodipudlu",
-    "anda",
-    "ande"
-  ],
-  "meat": [
-    "meat",
-    "mutton",
-    "chicken",
-    "fish"
-  ],
-  "chicken": [
-    "chicken",
-    "kodi"
-  ],
-  "mutton": [
-    "mutton",
-    "gorre"
-  ],
-  "fish": [
-    "fish",
-    "chepa",
-    "meen"
-  ],
-  "noodles": [
-    "noodles",
-    "instant noodles",
-    "maggi",
-    "yippee",
-    "maggi packet",
-    "yippie"
-  ],
-  "pasta": [
-    "pasta",
-    "macaroni"
-  ],
-  "ketchup": [
-    "ketchup",
-    "tomato sauce"
-  ],
-  "jam": [
-    "jam",
-    "fruit jam"
-  ],
-  "honey": [
-    "honey",
-    "dabur honey"
-  ],
-  "oats": [
-    "oats",
-    "rolled oats"
-  ],
-  "corn flakes": [
-    "corn flakes",
-    "cereal",
-    "breakfast cereal"
-  ],
-  "dry coconut": [
-    "dry coconut",
-    "copra",
-    "endukobbari",
-    "dry kobbari"
-  ],
-  "tamarind": [
-    "tamarind",
-    "chintapandu",
-    "imli",
-    "chinta pandu"
-  ],
-  "dates": [
-    "dates",
-    "khajur"
-  ]
+  "rice": ["rice","biyyam","chaaval","chawal","sannalu","rice bag","sona masoori","basmati","jeera rice"],
+  "wheat flour": ["wheat flour","atta","aata","godhuma pindi","gehun atta","chapati atta"],
+  "maida": ["maida","all purpose flour","white flour"],
+  "rava": ["rava","sooji","suji","semolina","upma rava","bombay rava"],
+  "poha": ["poha","atukulu","aval","pohe","avalakki"],
+  "vermicelli": ["vermicelli","semiya","semai","semiya noodles"],
+
+  "sugar": ["sugar","chekkera","shakkar","chini"],
+  "salt": ["salt","uppu","namak","iodized salt"],
+  "jaggery": ["jaggery","bellam","gur","gud","jaggary"],
+
+  "toor dal": ["toor dal","kandi pappu","arhar dal","tuvar dal"],
+  "moong dal": ["moong dal","pesara pappu","mung dal"],
+  "urad dal": ["urad dal","minapa pappu","udad dal"],
+  "chana dal": ["chana dal","senaga pappu","bengal gram dal"],
+  "masoor dal": ["masoor dal","red lentil","mosoor dal"],
+  "black gram": ["black gram","minumulu","urad whole"],
+  "green gram": ["green gram","pesalu","moong whole"],
+  "chickpeas": ["chickpeas","chana","senagalu","kabuli chana","kala chana"],
+  "rajma": ["rajma","kidney beans"],
+
+  "tea powder": ["tea","tea powder","chai","chai powder"],
+  "coffee powder": ["coffee","coffee powder","kaapi","kappi"],
+
+  "sunflower oil": ["sunflower oil","sunflower","oil","nune","tel"],
+  "groundnut oil": ["groundnut oil","peanut oil","verusenaga nune"],
+  "coconut oil": ["coconut oil","kobbari nune","narial oil"],
+  "gingelly oil": ["gingelly oil","sesame oil","nuvvula nune","til oil"],
+  "ghee": ["ghee","neyyi","clarified butter"],
+
+  "bread": ["bread","double roti","bun bread"],
+  "eggs": ["eggs","egg","kodipudlu","anda","ande"],
+  "meat": ["meat","mutton","chicken","fish"],
+  "chicken": ["chicken","kodi"],
+  "mutton": ["mutton","gorre"],
+  "fish": ["fish","chepa","meen"],
+
+  "noodles": ["noodles","instant noodles","maggi","yippee"],
+  "pasta": ["pasta","macaroni"],
+  "ketchup": ["ketchup","tomato sauce"],
+  "jam": ["jam","fruit jam"],
+  "honey": ["honey","dabur honey"],
+  "oats": ["oats","rolled oats"],
+  "corn flakes": ["corn flakes","cereal","breakfast cereal"],
+
+  "dry coconut": ["dry coconut","copra","endukobbari","dry kobbari"],
+  "tamarind": ["tamarind","chintapandu","imli"],
+  "dates": ["dates","khajur"]
 }
