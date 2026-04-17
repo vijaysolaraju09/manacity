@@ -141,7 +141,7 @@ exports.updateMobileMe = async (req, res, next) => {
 };
 
 
-exports.resetMobilePassword = async (req, res, next) => {
+exports.resetPassword = async (req, res, next) => {
   try {
     const userId = resolveAuthenticatedUserId(req);
 
@@ -207,3 +207,6 @@ exports.resetMobilePassword = async (req, res, next) => {
     return next(createError(500, 'INTERNAL_ERROR', 'Internal server error'));
   }
 };
+
+// Backward-compatible alias for any existing imports
+exports.resetMobilePassword = exports.resetPassword;
