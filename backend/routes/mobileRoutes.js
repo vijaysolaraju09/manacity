@@ -5,6 +5,10 @@ const homeController = require('../controllers/mobile/homeController');
 const userController = require('../controllers/mobile/userController');
 const searchController = require('../controllers/mobile/searchController');
 const quickOrderController = require('../controllers/mobile/quickOrderController');
+const {
+  createMobileBusinessRequest,
+  getMobileBusinessRequest,
+} = require('../controllers/businessRequestController');
 
 // Note: authMiddleware and locationMiddleware are applied globally in server.js
 // so this endpoint is already protected and scoped to a location.
@@ -44,6 +48,8 @@ router.get('/search', authMiddleware, searchController.search);
 router.get('/me', authMiddleware, userController.getMobileMe);
 router.put('/me', authMiddleware, userController.updateMobileMe);
 router.post('/quick-order', authMiddleware, quickOrderController.createQuickOrder);
+router.post('/business-request', authMiddleware, createMobileBusinessRequest);
+router.get('/business-request', authMiddleware, getMobileBusinessRequest);
 router.post('/me/reset-password', authMiddleware, userController.resetMobilePassword);
 
 module.exports = router;
